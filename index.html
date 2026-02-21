@@ -605,6 +605,12 @@ footer{background:var(--bg1);border-top:1px solid var(--bdr);padding:56px 60px 3
 .psp-paused{background:rgba(74,88,128,.15);color:var(--txt3);border:1px solid rgba(74,88,128,.2)}
 .proj-img-wrap{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
 
+.psp-updating{background:rgba(82,130,255,.1);color:var(--blue2);border:1px solid rgba(82,130,255,.25)}
+.pcard-btn-gh{border-color:var(--mint)!important;color:var(--mint)!important}
+.pcard-btn-gh:hover{background:var(--mint)!important;color:#020510!important}
+.proj-emoji-fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.proj-img-wrap{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
+
 /* ── RESPONSIVE ── */
 @media(max-width:1100px){
   .hero{grid-template-columns:1fr}
@@ -1170,256 +1176,260 @@ async function doForm(e){
 
 
 // ══════════════════════════════════════
-// SERVICE STATUS — Load from Firebase
+// FIREBASE — Single unified init
 // ══════════════════════════════════════
-(async function loadServiceStatus() {
-  const STATUS_STYLES = {
-    available: {
-      label: '● Now Available',
-      bg: 'rgba(62,240,184,0.12)',
-      color: '#3ef0b8',
-      border: 'rgba(62,240,184,0.35)',
-      dot: '#3ef0b8'
-    },
-    coming_soon: {
-      label: '◎ Coming Soon',
-      bg: 'rgba(245,200,66,0.12)',
-      color: '#f5c842',
-      border: 'rgba(245,200,66,0.35)',
-      dot: '#f5c842'
-    },
-    off: {
-      label: '○ Not Available',
-      bg: 'rgba(74,88,128,0.18)',
-      color: '#4a5880',
-      border: 'rgba(74,88,128,0.3)',
-      dot: '#4a5880'
-    }
-  };
+const FD_CFG = {
+  apiKey:            "AIzaSyCuEypEeXI7TVvos_1tMZ1o50EtJtefb7M",
+  authDomain:        "featuredesignzmain.firebaseapp.com",
+  projectId:         "featuredesignzmain",
+  storageBucket:     "featuredesignzmain.firebasestorage.app",
+  messagingSenderId: "307853117381",
+  appId:             "1:307853117381:web:fe3cab5e9ef0667d98edac"
+};
 
-  function renderBadge(sid, status) {
-    const el = document.getElementById('svc-badge-' + sid);
-    const card = document.getElementById('svc-' + sid);
-    if (!el) return;
+// ── STATUS CONFIG ────────────────────
+const SVC_BADGE_MAP = {
+  available:   { label:'● Now Available',  bg:'rgba(62,240,184,.12)',  color:'#3ef0b8', border:'rgba(62,240,184,.35)'  },
+  coming_soon: { label:'◎ Coming Soon',    bg:'rgba(245,200,66,.12)',  color:'#f5c842', border:'rgba(245,200,66,.35)'  },
+  off:         { label:'○ Not Available',  bg:'rgba(74,88,128,.14)',   color:'#4a5880', border:'rgba(74,88,128,.3)'    }
+};
 
-    const st = STATUS_STYLES[status] || STATUS_STYLES['available'];
-    el.innerHTML = `<span style="
-      display:inline-flex;align-items:center;gap:7px;
-      font-family:'JetBrains Mono',monospace;font-size:.6rem;
-      letter-spacing:.14em;text-transform:uppercase;
-      padding:5px 12px;
-      background:${st.bg};
-      color:${st.color};
-      border:1px solid ${st.border};
-      margin-top:8px;
-      ">${st.label}</span>`;
+const PROJ_STATUS_MAP = {
+  completed:   { cls:'psp-completed',   icon:'✓',  label:'Completed'   },
+  inprogress:  { cls:'psp-inprogress',  icon:'⟳',  label:'In Progress' },
+  update_soon: { cls:'psp-update_soon', icon:'🔄', label:'Update Soon'  },
+  updating:    { cls:'psp-updating',    icon:'⚡',  label:'Updating'    },
+  paused:      { cls:'psp-paused',      icon:'⏸',  label:'Paused'      },
+};
 
-    // Dim card if off
-    if (card) {
-      card.style.opacity = status === 'off' ? '0.45' : '1';
-      card.style.pointerEvents = status === 'off' ? 'none' : '';
-    }
-  }
+const STUDIO_MAP = {
+  available:   { label:'Available',     color:'#3ef0b8' },
+  unavailable: { label:'Fully Booked',  color:'#f87171' },
+  limited:     { label:'Limited Slots', color:'#f5c842' },
+  custom:      { label:'',              color:'#7ba4ff'  },
+};
 
-  // Default: all available while loading
-  ['web','mobile','design','video'].forEach(sid => renderBadge(sid, 'available'));
+function fdEsc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+// ── UNIFIED FIREBASE LOADER ─────────
+(async function initFrontendFirebase() {
   try {
-    const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
-    const { getFirestore, doc, getDoc, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    const { initializeApp }  = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+    const { getFirestore, doc, collection, query, orderBy, onSnapshot }
+      = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
 
-    const cfg = {
-      apiKey:"AIzaSyCuEypEeXI7TVvos_1tMZ1o50EtJtefb7M",
-      authDomain:"featuredesignzmain.firebaseapp.com",
-      projectId:"featuredesignzmain",
-      storageBucket:"featuredesignzmain.firebasestorage.app",
-      messagingSenderId:"307853117381",
-      appId:"1:307853117381:web:fe3cab5e9ef0667d98edac"
-    };
+    const fbApp = initializeApp(FD_CFG, 'fd-frontend');
+    const db    = getFirestore(fbApp);
 
-    const app = getApps().length ? getApps()[0] : initializeApp(cfg, 'frontend');
-    const db = getFirestore(app);
+    // ── 1. PROJECTS ──────────────────
+    const pq = query(collection(db,'projects'), orderBy('createdAt','desc'));
+    onSnapshot(pq, snap => {
+      const projects = snap.docs.map(d => ({id:d.id,...d.data()}));
+      renderProjectGrid(projects);
+    }, () => renderProjectGrid([]));
 
-    // Real-time listener for service statuses
-    const svcIds = ['web','mobile','design','video'];
-    svcIds.forEach(sid => {
-      onSnapshot(doc(db, 'services', sid), (snap) => {
-        const status = snap.exists() ? (snap.data().status || 'available') : 'available';
-        renderBadge(sid, status);
+    // ── 2. SERVICE STATUSES ──────────
+    ['web','mobile','design','video'].forEach(sid => {
+      onSnapshot(doc(db,'services',sid), snap => {
+        const status = snap.exists() ? (snap.data().status||'available') : 'available';
+        applyServiceBadge(sid, status);
       });
     });
 
+    // ── 3. STUDIO STATUS ─────────────
+    onSnapshot(doc(db,'settings','studio'), snap => {
+      const d = snap.exists() ? snap.data() : {};
+      applyStudioStatus(d);
+    });
+
+    // ── 4. YOUTUBE ───────────────────
+    onSnapshot(doc(db,'settings','youtube'), snap => {
+      if (snap.exists()) applyYoutube(snap.data());
+    });
+
+    // ── 5. SOCIAL LINKS ──────────────
+    onSnapshot(doc(db,'settings','social'), snap => {
+      if (snap.exists()) applySocialLinks(snap.data());
+    });
+
   } catch(e) {
-    console.warn('Service status: Firebase not available, using defaults.', e.message);
-    // Defaults already set above
+    console.warn('Firebase init error:', e.message);
+    renderProjectGrid([]); // show empty state
   }
 })();
 
-// ══════════════════════════════════════
-// PROJECTS — Load from Firebase (real-time)
-// ══════════════════════════════════════
-(async function loadProjects() {
-  const CAT_LABEL = { web:'Web Dev', mobile:'Mobile App', design:'Graphics Design', video:'Video Editing' };
-  const CAT_COL   = { web:'cw', mobile:'cm', design:'cd', video:'cv' };
-  const BG_MAP    = { web:'tb1', mobile:'tb2', design:'tb3', video:'tb4' };
-  const STATUS_PILL = {
-    completed:   { cls:'psp-completed',   icon:'✓', label:'Completed'   },
-    inprogress:  { cls:'psp-inprogress',  icon:'⟳', label:'In Progress' },
-    update_soon: { cls:'psp-update_soon', icon:'🔄', label:'Update Soon' },
-    paused:      { cls:'psp-paused',      icon:'⏸', label:'Paused'      },
+// ── PROJECT GRID ─────────────────────
+const CAT_LABEL = { web:'Web Dev', mobile:'Mobile App', design:'Graphics Design', video:'Video Editing' };
+const CAT_COL   = { web:'cw', mobile:'cm', design:'cd', video:'cv' };
+const BG_MAP    = { web:'tb1', mobile:'tb2', design:'tb3', video:'tb4' };
+
+function buildProjectCard(p) {
+  const bg   = BG_MAP[p.cat]   || 'tb1';
+  const col  = CAT_COL[p.cat]  || 'cw';
+  const cat  = CAT_LABEL[p.cat]|| p.cat || '';
+  const tags = (p.tags||[]).slice(0,4).map(t=>`<span class="ptag">${fdEsc(t)}</span>`).join('');
+
+  // Status pill — only show if not completed or if has special status
+  const stMap = PROJ_STATUS_MAP[p.status];
+  const showPill = p.status && p.status !== 'completed' && stMap;
+  const pillHtml = showPill
+    ? `<div class="proj-status-pill ${stMap.cls}">${stMap.icon} ${stMap.label}</div>`
+    : '';
+
+  // Hide status pill if display=false in admin
+  const hideStatus = p.hideStatus === true;
+
+  // Thumb — image or emoji
+  const thumb = p.imageUrl
+    ? `<img src="${fdEsc(p.imageUrl)}" class="proj-img-wrap" alt="${fdEsc(p.name)}" loading="lazy"
+          onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+    + `<span class="proj-emoji-fallback" style="display:none;font-size:2.8rem">${fdEsc(p.emoji||'📁')}</span>`
+    : `<span style="font-size:2.8rem">${fdEsc(p.emoji||'📁')}</span>`;
+
+  const actions = [
+    p.url       ? `<a href="${fdEsc(p.url)}"       target="_blank" class="pcard-btn">View Live</a>`  : '',
+    p.githubUrl ? `<a href="${fdEsc(p.githubUrl)}" target="_blank" class="pcard-btn pcard-btn-gh">GitHub</a>` : ''
+  ].filter(Boolean).join('');
+
+  return `
+    <div class="pcard pcard-dyn" data-cat="${fdEsc(p.cat)}">
+      <div class="pcard-thumb ${bg}">
+        ${thumb}
+        <div class="pcard-ov">${actions || '<span style="font-family:JetBrains Mono,monospace;font-size:.65rem;color:var(--txt3)">No link</span>'}</div>
+      </div>
+      <div class="pcard-body">
+        <div class="pcard-cat ${col}">${fdEsc(cat)}</div>
+        <div class="pcard-name">${fdEsc(p.name)}</div>
+        <p class="pcard-desc">${fdEsc(p.desc)}</p>
+        ${!hideStatus ? pillHtml : ''}
+        <div class="pcard-tags">${tags}</div>
+      </div>
+    </div>`;
+}
+
+let _activeFilter = 'all';
+
+function renderProjectGrid(projects) {
+  const grid     = document.getElementById('pGrid');
+  const emptyMsg = document.getElementById('proj-empty-msg');
+  if (!grid) return;
+
+  const visible = projects.filter(p => p.status !== 'off' && p.display !== false);
+
+  if (!visible.length) {
+    grid.innerHTML = '';
+    if (emptyMsg) emptyMsg.style.display = 'block';
+    return;
+  }
+  if (emptyMsg) emptyMsg.style.display = 'none';
+  grid.innerHTML = visible.map(buildProjectCard).join('');
+
+  applyProjectFilter(_activeFilter);
+
+  // Stagger animation
+  grid.querySelectorAll('.pcard-dyn').forEach((c,i) => {
+    c.style.opacity   = '0';
+    c.style.transform = 'translateY(18px)';
+    setTimeout(() => {
+      c.style.transition = 'opacity .45s, transform .45s';
+      c.style.opacity    = '1';
+      c.style.transform  = 'none';
+    }, i * 80);
+  });
+}
+
+function applyProjectFilter(f) {
+  _activeFilter = f;
+  document.querySelectorAll('.pcard-dyn').forEach(c => {
+    const show = f === 'all' || c.dataset.cat === f;
+    if (show) {
+      c.style.display = '';
+      requestAnimationFrame(() => {
+        c.style.transition = 'opacity .35s, transform .35s';
+        c.style.opacity    = '1';
+        c.style.transform  = 'none';
+      });
+    } else {
+      c.style.transition = 'opacity .2s';
+      c.style.opacity    = '0';
+      setTimeout(() => c.style.display = 'none', 220);
+    }
+  });
+}
+
+// Filter bar
+document.getElementById('fBar')?.addEventListener('click', e => {
+  if (!e.target.classList.contains('pf')) return;
+  document.querySelectorAll('.pf').forEach(b => b.classList.remove('on'));
+  e.target.classList.add('on');
+  applyProjectFilter(e.target.dataset.f);
+});
+
+// ── SERVICE BADGES ───────────────────
+function applyServiceBadge(sid, status) {
+  const b = document.getElementById('svc-badge-' + sid);
+  const card = document.getElementById('svc-' + sid);
+  if (!b) return;
+  const st = SVC_BADGE_MAP[status] || SVC_BADGE_MAP['available'];
+  b.innerHTML = `<span style="
+    display:inline-flex;align-items:center;gap:7px;
+    font-family:'JetBrains Mono',monospace;font-size:.58rem;
+    letter-spacing:.14em;text-transform:uppercase;
+    padding:5px 13px;
+    background:${st.bg};color:${st.color};border:1px solid ${st.border};
+    margin-top:8px;">${st.label}</span>`;
+  if (card) {
+    card.style.opacity       = status === 'off' ? '0.42' : '1';
+    card.style.pointerEvents = status === 'off' ? 'none'  : '';
+  }
+}
+
+// Default all available while loading
+['web','mobile','design','video'].forEach(sid => applyServiceBadge(sid,'available'));
+
+// ── STUDIO STATUS ────────────────────
+function applyStudioStatus(data) {
+  const status = data.status || 'available';
+  const s = STUDIO_MAP[status] || STUDIO_MAP['available'];
+  const label = status === 'custom' ? (data.customLabel || data.label || 'Available') : s.label;
+  const color = s.color;
+  const dot   = document.getElementById('hero-studio-dot');
+  const lbl   = document.getElementById('hero-studio-label');
+  if (lbl) { lbl.textContent = label; lbl.style.color = color; }
+  if (dot) { dot.style.background = color; dot.style.boxShadow = '0 0 8px ' + color; }
+}
+
+// ── YOUTUBE ──────────────────────────
+function applyYoutube(data) {
+  const iframe   = document.getElementById('yt-iframe');
+  const headEl   = document.getElementById('yt-heading-txt');
+  const descEl   = document.getElementById('yt-desc-txt');
+  const btnEl    = document.getElementById('yt-subscribe-btn');
+  const btnLabel = document.getElementById('yt-btn-label');
+  if (iframe   && data.embedUrl) iframe.src          = data.embedUrl;
+  if (headEl   && data.heading)  headEl.innerHTML    = data.heading;
+  if (descEl   && data.desc)     descEl.textContent  = data.desc;
+  if (btnEl    && data.channel)  btnEl.href          = data.channel;
+  if (btnLabel && data.btnTxt)   btnLabel.textContent = data.btnTxt;
+}
+
+// ── SOCIAL LINKS ─────────────────────
+function applySocialLinks(data) {
+  const wa = data.whatsapp ? 'https://wa.me/' + String(data.whatsapp).replace(/[^0-9]/g,'') : '';
+  const setLink = (id, href) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (href) { el.href = href; el.style.display = ''; }
+    else el.style.display = 'none';
   };
-
-  function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
-  function buildCard(p) {
-    const bg   = BG_MAP[p.cat]   || 'tb1';
-    const col  = CAT_COL[p.cat]  || 'cw';
-    const cat  = CAT_LABEL[p.cat]|| p.cat || '';
-    const tags = (p.tags||[]).slice(0,4).map(t=>`<span class="ptag">${esc(t)}</span>`).join('');
-    const pill = p.status && p.status !== 'completed' ? STATUS_PILL[p.status] : null;
-    const pillHtml = pill
-      ? `<div class="proj-status-pill ${pill.cls}">${pill.icon} ${pill.label}</div>`
-      : (p.status==='completed'||p.progress>=100 ? `<div class="proj-status-pill psp-completed">✓ Completed</div>` : '');
-
-    // Image or emoji thumb
-    const thumbContent = p.imageUrl
-      ? `<img src="${esc(p.imageUrl)}" class="proj-img-wrap" alt="${esc(p.name)}" loading="lazy" onerror="this.parentElement.innerHTML='<span style=\'font-size:2.8rem\'>${esc(p.emoji||'📁')}</span>'">`
-      : `<span style="font-size:2.8rem">${esc(p.emoji||'📁')}</span>`;
-
-    const actions = [
-      p.url      ? `<a href="${esc(p.url)}" target="_blank" class="pcard-btn">View Live</a>` : '',
-      p.githubUrl? `<a href="${esc(p.githubUrl)}" target="_blank" class="pcard-btn" style="border-color:var(--mint);color:var(--mint)">GitHub</a>` : ''
-    ].filter(Boolean).join('');
-
-    return `
-      <div class="pcard pcard-dyn" data-cat="${esc(p.cat)}">
-        <div class="pcard-thumb ${bg}">
-          ${thumbContent}
-          <div class="pcard-ov">${actions||'<span style="color:var(--txt3);font-family:JetBrains Mono,monospace;font-size:.65rem">No link</span>'}</div>
-        </div>
-        <div class="pcard-body">
-          <div class="pcard-cat ${col}">${esc(cat)}</div>
-          <div class="pcard-name">${esc(p.name)}</div>
-          <p class="pcard-desc">${esc(p.desc)}</p>
-          ${pillHtml}
-          <div class="pcard-tags">${tags}</div>
-        </div>
-      </div>`;
-  }
-
-  function renderGrid(projects) {
-    const grid = document.getElementById('pGrid');
-    const emptyMsg = document.getElementById('proj-empty-msg');
-    if (!grid) return;
-
-    // Filter out hidden (off) projects
-    const visible = projects.filter(p => p.status !== 'off' && p.display !== false);
-
-    if (!visible.length) {
-      grid.innerHTML = '';
-      if (emptyMsg) emptyMsg.style.display = 'block';
-      return;
-    }
-    if (emptyMsg) emptyMsg.style.display = 'none';
-
-    grid.innerHTML = visible.map(buildCard).join('');
-
-    // Re-apply active filter
-    if (typeof applyProjectFilter === 'function') {
-      applyProjectFilter(window._activeFilter || 'all');
-    }
-
-    // Animate cards in
-    grid.querySelectorAll('.pcard-dyn').forEach((c,i) => {
-      c.style.opacity = '0';
-      c.style.transform = 'translateY(20px)';
-      setTimeout(() => {
-        c.style.transition = 'opacity .5s, transform .5s';
-        c.style.opacity = '1';
-        c.style.transform = 'none';
-      }, i * 80);
-    });
-  }
-
-  try {
-    const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
-    const { getFirestore, collection, query, orderBy, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-
-    const cfg = {
-      apiKey:"AIzaSyCuEypEeXI7TVvos_1tMZ1o50EtJtefb7M",
-      authDomain:"featuredesignzmain.firebaseapp.com",
-      projectId:"featuredesignzmain",
-      storageBucket:"featuredesignzmain.firebasestorage.app",
-      messagingSenderId:"307853117381",
-      appId:"1:307853117381:web:fe3cab5e9ef0667d98edac"
-    };
-
-    const appName = 'frontend-proj';
-    const app = getApps().find(a=>a.name===appName) || initializeApp(cfg, appName);
-    const db  = getFirestore(app);
-
-    const q = query(collection(db,'projects'), orderBy('createdAt','desc'));
-    onSnapshot(q, snap => {
-      const projects = snap.docs.map(d=>({id:d.id,...d.data()}));
-      renderGrid(projects);
-    });
-
-  } catch(e) {
-    console.warn('Projects Firebase error:', e.message);
-    const grid = document.getElementById('pGrid');
-    if (grid) grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--txt3)"><div style="font-size:2rem;margin-bottom:10px">📁</div><div>Add projects from the admin panel</div></div>';
-  }
-})();
-
-// ══════════════════════════════════════
-// YOUTUBE SECTION — Load from Firebase
-// ══════════════════════════════════════
-(async function loadYoutubeSection() {
-  const DEFAULT_EMBED = 'https://www.youtube.com/embed?listType=user_uploads&list=UCda2mc_f-nIinjWpDUJiA2g';
-  const DEFAULT_CHANNEL = 'https://www.youtube.com/channel/UCda2mc_f-nIinjWpDUJiA2g';
-
-  function applyYtSettings(data) {
-    const iframe   = document.getElementById('yt-iframe');
-    const headEl   = document.getElementById('yt-heading-txt');
-    const descEl   = document.getElementById('yt-desc-txt');
-    const btnEl    = document.getElementById('yt-subscribe-btn');
-    const btnLabel = document.getElementById('yt-btn-label');
-
-    if (iframe && data.embedUrl)   iframe.src = data.embedUrl;
-    if (headEl && data.heading)    headEl.innerHTML = data.heading;
-    if (descEl && data.desc)       descEl.textContent = data.desc;
-    if (btnEl  && data.channel)    btnEl.href = data.channel;
-    if (btnLabel && data.btnTxt)   btnLabel.textContent = data.btnTxt;
-  }
-
-  try {
-    const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
-    const { getFirestore, doc, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-
-    const cfg = {
-      apiKey:"AIzaSyCuEypEeXI7TVvos_1tMZ1o50EtJtefb7M",
-      authDomain:"featuredesignzmain.firebaseapp.com",
-      projectId:"featuredesignzmain",
-      storageBucket:"featuredesignzmain.firebasestorage.app",
-      messagingSenderId:"307853117381",
-      appId:"1:307853117381:web:fe3cab5e9ef0667d98edac"
-    };
-
-    const appName = 'frontend-yt';
-    const app = getApps().find(a => a.name === appName) || initializeApp(cfg, appName);
-    const db = getFirestore(app);
-
-    // Real-time listener
-    onSnapshot(doc(db, 'settings', 'youtube'), snap => {
-      if (snap.exists()) {
-        applyYtSettings(snap.data());
-      }
-    });
-
-  } catch(e) {
-    console.warn('YouTube section: Firebase not available, using defaults.', e.message);
-  }
-})();
+  setLink('sl-yt', data.youtube); setLink('sl-fb', data.facebook);
+  setLink('sl-ig', data.instagram); setLink('sl-wa', wa);
+  setLink('sl-tt', data.tiktok);  setLink('sl-tw', data.twitter);
+  setLink('ft-yt', data.youtube); setLink('ft-ig', data.instagram);
+  setLink('ft-fb', data.facebook); setLink('ft-wa', wa);
+  const ytBtn = document.getElementById('yt-subscribe-btn');
+  if (ytBtn && data.youtube) ytBtn.href = data.youtube;
+}
 
 </script>
 </body>
