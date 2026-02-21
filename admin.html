@@ -58,6 +58,9 @@ const gProvider = new GoogleAuthProvider();
 ══════════════════════════════════════ */
 let currentUser = null;
 let currentRole = null; // 'main_admin' | 'admin'
+// Expose to plain scripts
+Object.defineProperty(window, 'currentUser', { get: () => currentUser });
+Object.defineProperty(window, 'currentRole', { get: () => currentRole });
 let unsubMessages = null;
 let unsubProjects = null;
 
@@ -241,6 +244,7 @@ function initApp(user, role) {
   subscribeServices();
   loadYoutubeSettings();
   subscribeSocial();
+  subscribeStudioStatus();
   if (role === 'main_admin') subscribeAdmins();
 
   // Show dashboard
@@ -444,6 +448,7 @@ function subscribeProjects() {
     renderProjects();
     renderDash();
     renderProjectsSection();
+    renderSvcProjectQuick();
   });
 }
 
@@ -773,11 +778,12 @@ window.gotoPage = function(id) {
   document.querySelectorAll('.sb-it').forEach(i => {
     if (i.getAttribute('onclick')?.includes("'" + id + "'")) i.classList.add('on');
   });
-  const titles = { dashboard:'Dashboard', projects:'All Projects', project_view:'Projects Overview', messages:'Messages', services:'Services Status', youtube:'YouTube Section', social:'Social Media Links', admins:'Admin Management', settings:'Settings' };
+  const titles = { dashboard:'Dashboard', projects:'All Projects', project_view:'Projects Overview', messages:'Messages', studio:'Studio Status', services:'Services Status', youtube:'YouTube Section', social:'Social Media Links', admins:'Admin Management', settings:'Settings' };
   const el = document.getElementById('tb-title');
   if (el) el.textContent = titles[id] || id;
   if (id === 'dashboard') renderDash();
   if (id === 'project_view') renderProjectsSection();
+  if (id === 'studio')   renderStudioPage();
   if (id === 'services') renderServicePage();
   if (id === 'youtube')  renderYoutubePage();
   if (id === 'social')   renderSocialPage();
@@ -1239,6 +1245,10 @@ tr:hover td{background:rgba(82,130,255,.03)}
         <span class="sb-badge" id="msgBadge" style="display:none">0</span>
       </div>
       <div class="sb-sec">Website</div>
+      <div class="sb-it" onclick="gotoPage('studio')">
+        <svg class="sb-ico" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+        Studio Status
+      </div>
       <div class="sb-it" onclick="gotoPage('services')">
         <svg class="sb-ico" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
         Services Status
@@ -1420,12 +1430,92 @@ tr:hover td{background:rgba(82,130,255,.03)}
         <div id="adm-list"></div>
       </div>
 
+      <!-- STUDIO STATUS -->
+      <div class="page" id="page-studio">
+        <div class="ph">
+          <div class="ph-title">Studio <em>Status</em></div>
+        </div>
+        <div style="max-width:680px;margin:0 auto">
+          <div style="background:rgba(82,130,255,.07);border:1px solid rgba(82,130,255,.2);padding:14px 18px;margin-bottom:24px;font-size:.84rem;color:var(--txt2);display:flex;align-items:center;gap:12px">
+            <span style="font-size:1.4rem">🏢</span>
+            <div>This status appears as the <strong style="color:var(--txt)">"Studio Status"</strong> badge on the live website hero section. Change it anytime — updates instantly.</div>
+          </div>
+
+          <!-- Current status display -->
+          <div style="background:var(--bg2);border:1px solid var(--bdr);padding:28px;margin-bottom:18px;text-align:center">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--txt3);margin-bottom:14px">Current Studio Status</div>
+            <div id="studio-current-badge" style="display:inline-flex;align-items:center;gap:10px;font-family:'JetBrains Mono',monospace;font-size:.88rem;letter-spacing:.12em;padding:14px 28px;background:rgba(62,240,184,.1);border:1px solid rgba(62,240,184,.3);color:var(--mint)">
+              <span style="width:9px;height:9px;border-radius:50%;background:var(--mint);display:inline-block;box-shadow:0 0 8px var(--mint)"></span>
+              Available for Projects
+            </div>
+          </div>
+
+          <!-- Status options -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+
+            <div class="studio-opt" id="sopt-available" onclick="setStudioStatus('available')"
+              style="background:var(--bg2);border:2px solid rgba(62,240,184,.4);padding:22px;cursor:pointer;transition:all .25s;text-align:center">
+              <div style="font-size:2rem;margin-bottom:10px">✅</div>
+              <div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:1rem;color:var(--mint);margin-bottom:5px">Available</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--txt3)">Open for new projects</div>
+              <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:.58rem;padding:5px 12px;background:rgba(62,240,184,.1);border:1px solid rgba(62,240,184,.25);color:var(--mint);display:inline-block">● Available for Projects</div>
+            </div>
+
+            <div class="studio-opt" id="sopt-unavailable" onclick="setStudioStatus('unavailable')"
+              style="background:var(--bg2);border:2px solid var(--bdr);padding:22px;cursor:pointer;transition:all .25s;text-align:center">
+              <div style="font-size:2rem;margin-bottom:10px">🔴</div>
+              <div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:1rem;color:var(--red);margin-bottom:5px">Unavailable</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--txt3)">Currently fully booked</div>
+              <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:.58rem;padding:5px 12px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);color:var(--red);display:inline-block">● Fully Booked</div>
+            </div>
+
+            <div class="studio-opt" id="sopt-limited" onclick="setStudioStatus('limited')"
+              style="background:var(--bg2);border:2px solid var(--bdr);padding:22px;cursor:pointer;transition:all .25s;text-align:center">
+              <div style="font-size:2rem;margin-bottom:10px">⚡</div>
+              <div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:1rem;color:var(--gold);margin-bottom:5px">Limited Slots</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--txt3)">Few spots remaining</div>
+              <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:.58rem;padding:5px 12px;background:rgba(245,200,66,.1);border:1px solid rgba(245,200,66,.25);color:var(--gold);display:inline-block">⚡ Limited Slots</div>
+            </div>
+
+            <div class="studio-opt" id="sopt-custom" onclick="focusCustomStatus()"
+              style="background:var(--bg2);border:2px solid var(--bdr);padding:22px;cursor:pointer;transition:all .25s;text-align:center">
+              <div style="font-size:2rem;margin-bottom:10px">✏️</div>
+              <div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:1rem;color:var(--blue2);margin-bottom:5px">Custom</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--txt3);margin-bottom:10px">Write your own status</div>
+              <input id="studio-custom-input" onclick="event.stopPropagation()" type="text"
+                class="fi" placeholder="e.g. On Holiday — Back Jan 1"
+                style="font-size:.72rem;padding:7px 10px;text-align:center;width:100%">
+            </div>
+
+          </div>
+
+          <button class="btn btn-primary" onclick="saveCustomStudioStatus()" style="width:100%;justify-content:center;padding:13px">
+            ⚡ Save Custom Status to Live Website
+          </button>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--txt3);text-align:center;margin-top:8px">Quick-select buttons above save instantly without this button</div>
+        </div>
+      </div>
+
       <!-- SERVICES STATUS -->
       <div class="page" id="page-services">
         <div class="ph">
           <div class="ph-title">Services <em>Status</em></div>
           <button class="btn btn-ghost btn-sm" onclick="resetAllServices()">↺ Reset All to Available</button>
         </div>
+        <!-- Project Visibility Quick Panel -->
+        <div style="background:var(--bg2);border:1px solid var(--bdr2);padding:20px;margin-bottom:22px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <div>
+              <div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:.96rem;margin-bottom:3px">🗂️ Project Visibility Quick Control</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.1em;color:var(--txt3);text-transform:uppercase">Show / Hide projects on live website</div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="gotoPage('project_view')">Full Projects View →</button>
+          </div>
+          <div id="svc-proj-quick" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px">
+            <div class="empty" style="padding:14px;grid-column:1/-1"><div class="empty-ico" style="font-size:1.4rem">📁</div><div class="empty-txt">Loading projects...</div></div>
+          </div>
+        </div>
+
         <div style="background:rgba(82,130,255,.07);border:1px solid rgba(82,130,255,.2);padding:14px 18px;margin-bottom:22px;display:flex;align-items:center;gap:12px;font-size:.84rem;color:var(--txt2)">
           <span style="font-size:1.4rem">⚡</span>
           <div>Changes apply to the <strong style="color:var(--txt)">live website instantly</strong> in real-time — no refresh needed. Visitors will see updated badges immediately.</div>
@@ -1822,7 +1912,53 @@ function subscribeServices() {
   });
 }
 
+function renderSvcProjectQuick() {
+  const el = document.getElementById('svc-proj-quick');
+  if (!el) return;
+  const visible = projectsCache.filter(p => p.status !== 'off');
+  const hidden  = projectsCache.filter(p => p.status === 'off');
+  const all = [...visible, ...hidden];
+  if (!all.length) {
+    el.innerHTML = '<div class="empty" style="padding:14px;grid-column:1/-1"><div class="empty-ico" style="font-size:1.4rem">📁</div><div class="empty-txt">No projects yet — add from Manage Projects</div></div>';
+    return;
+  }
+  el.innerHTML = all.map(p => {
+    const isOff = p.status === 'off' || p.display === false;
+    const col = isOff ? 'var(--red)' : 'var(--mint)';
+    const icon = isOff ? '🚫' : '✅';
+    return `
+      <div style="background:var(--bg3);border:1px solid ${isOff ? 'rgba(248,113,113,.2)' : 'var(--bdr)'};padding:10px 12px;display:flex;align-items:center;gap:9px;opacity:${isOff ? '.7' : '1'}">
+        <span style="font-size:1.1rem">${p.emoji || '📁'}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.8rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:.54rem;color:${col};margin-top:2px">${icon} ${isOff ? 'Hidden' : 'Visible'}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:.62rem;flex-shrink:0"
+          onclick="toggleProjDisplay('${p.id}',${!isOff})">${isOff ? '👁 Show' : '🚫 Hide'}</button>
+      </div>`;
+  }).join('');
+}
+
+window.toggleProjDisplay = async function(id, makeHidden) {
+  const _db = window.__db;
+  if (!_db) { toast('Database not ready', 'error'); return; }
+  try {
+    const { doc, updateDoc } = window.__fbModules;
+    const newStatus = makeHidden ? 'off' : 'completed';
+    const p = projectsCache.find(x => x.id === id);
+    // If hiding, set status=off; if showing, restore previous or default to completed
+    const restoreStatus = p?.prevStatus || 'completed';
+    await updateDoc(doc(_db, 'projects', id), {
+      status:  makeHidden ? 'off' : restoreStatus,
+      display: !makeHidden,
+      prevStatus: makeHidden ? (p?.status || 'completed') : p?.prevStatus
+    });
+    toast(makeHidden ? 'Project hidden from website ✓' : 'Project visible on website ✓', 'success');
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+};
+
 function renderServicePage() {
+  renderSvcProjectQuick();
   const grid = document.getElementById('svc-status-grid');
   if (!grid) return;
   grid.innerHTML = SERVICES_DEF.map(svc => `
@@ -1873,7 +2009,7 @@ window.setServiceStatus = async function(sid, status) {
     await setDoc(doc(_db, 'services', sid), {
       status,
       updatedAt: serverTimestamp(),
-      updatedBy: currentUser?.email || 'admin'
+      updatedBy: window.window.currentUser?.email || 'admin'
     });
     servicesCache[sid] = status;
     renderSvcCard(sid);
@@ -1976,7 +2112,7 @@ window.saveYoutubeSettings = async function() {
       btnTxt:  btnTxt  || 'Subscribe Now',
       heading: heading || 'Tutorials, Tips & Behind the Scenes',
       updatedAt: serverTimestamp(),
-      updatedBy: currentUser?.email || 'admin'
+      updatedBy: window.window.currentUser?.email || 'admin'
     });
     ytCache = { videoUrl:rawUrl, embedUrl, title, desc, channel, btnTxt, heading };
     updateYoutubePreview();
@@ -2056,7 +2192,7 @@ function renderSocialPage() {
 window.saveSocialLinks = async function() {
   const _db = window.__db;
   if (!_db) { toast('Database not ready', 'error'); return; }
-  const data = { updatedAt: window.__fbModules.serverTimestamp(), updatedBy: currentUser?.email || 'admin' };
+  const data = { updatedAt: window.__fbModules.serverTimestamp(), updatedBy: window.window.currentUser?.email || 'admin' };
   SOCIAL_FIELDS.forEach(f => {
     const el = document.getElementById(f.field);
     data[f.id] = el ? el.value.trim() : '';
@@ -2069,12 +2205,112 @@ window.saveSocialLinks = async function() {
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 };
 
+/* ══════════════════════════════════════
+   STUDIO STATUS MANAGEMENT
+══════════════════════════════════════ */
+const STUDIO_STATUSES = {
+  available:   { label:'Available for Projects', dot:'var(--mint)',  bg:'rgba(62,240,184,.1)',  border:'rgba(62,240,184,.3)',  color:'var(--mint)' },
+  unavailable: { label:'Fully Booked',           dot:'var(--red)',   bg:'rgba(248,113,113,.1)', border:'rgba(248,113,113,.3)', color:'var(--red)'  },
+  limited:     { label:'Limited Slots',           dot:'var(--gold)',  bg:'rgba(245,200,66,.1)',  border:'rgba(245,200,66,.3)',  color:'var(--gold)' },
+};
+
+let studioStatusCache = 'available';
+
+function subscribeStudioStatus() {
+  const _db = window.__db;
+  if (!_db) { setTimeout(subscribeStudioStatus, 600); return; }
+  const { doc, onSnapshot } = window.__fbModules;
+  onSnapshot(doc(_db, 'settings', 'studio'), snap => {
+    const d = snap.exists() ? snap.data() : {};
+    studioStatusCache = d.status || 'available';
+    renderStudioBadge(d.status || 'available', d.customLabel || '');
+    updateStudioOptHighlight(d.status || 'available');
+  });
+}
+
+function renderStudioBadge(status, customLabel) {
+  const el = document.getElementById('studio-current-badge');
+  if (!el) return;
+  const isCustom = status === 'custom';
+  const s = STUDIO_STATUSES[status] || STUDIO_STATUSES['available'];
+  const label = isCustom ? (customLabel || 'Custom Status') : s.label;
+  const col   = isCustom ? 'var(--blue2)' : s.color;
+  const bg    = isCustom ? 'rgba(82,130,255,.1)' : s.bg;
+  const bdr   = isCustom ? 'rgba(82,130,255,.3)' : s.border;
+  el.innerHTML = `<span style="width:9px;height:9px;border-radius:50%;background:${col};display:inline-block;box-shadow:0 0 8px ${col};animation:pulse 2s ease infinite"></span> ${label}`;
+  el.style.cssText = `display:inline-flex;align-items:center;gap:10px;font-family:'JetBrains Mono',monospace;font-size:.88rem;letter-spacing:.12em;padding:14px 28px;background:${bg};border:1px solid ${bdr};color:${col}`;
+}
+
+function updateStudioOptHighlight(status) {
+  ['available','unavailable','limited','custom'].forEach(k => {
+    const el = document.getElementById('sopt-' + k);
+    if (!el) return;
+    const s = STUDIO_STATUSES[k] || { border: 'var(--bdr)', color: 'var(--blue)' };
+    if (k === status) {
+      el.style.borderColor  = k === 'custom' ? 'rgba(82,130,255,.5)' : s.border || s.color;
+      el.style.background   = k === 'custom' ? 'rgba(82,130,255,.06)' : (s.bg || 'rgba(82,130,255,.06)');
+      el.style.transform    = 'translateY(-3px)';
+      el.style.boxShadow    = '0 8px 24px rgba(0,0,0,.3)';
+    } else {
+      el.style.borderColor  = 'var(--bdr)';
+      el.style.background   = 'var(--bg2)';
+      el.style.transform    = '';
+      el.style.boxShadow    = '';
+    }
+  });
+}
+
+window.setStudioStatus = async function(status) {
+  const _db = window.__db;
+  if (!_db) { toast('Database not ready', 'error'); return; }
+  const s = STUDIO_STATUSES[status];
+  if (!s) return;
+  try {
+    const { doc, setDoc, serverTimestamp } = window.__fbModules;
+    await setDoc(doc(_db, 'settings', 'studio'), {
+      status,
+      label: s.label,
+      customLabel: '',
+      updatedAt: serverTimestamp(),
+      updatedBy: window.currentUser?.email || 'admin'
+    });
+    toast('Studio status → ' + s.label + ' ✓ Live!', 'success');
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+};
+
+window.focusCustomStatus = function() {
+  document.getElementById('studio-custom-input')?.focus();
+  updateStudioOptHighlight('custom');
+};
+
+window.saveCustomStudioStatus = async function() {
+  const _db = window.__db;
+  if (!_db) { toast('Database not ready', 'error'); return; }
+  const customLabel = document.getElementById('studio-custom-input')?.value?.trim();
+  if (!customLabel) { toast('Enter a custom status text first', 'error'); return; }
+  try {
+    const { doc, setDoc, serverTimestamp } = window.__fbModules;
+    await setDoc(doc(_db, 'settings', 'studio'), {
+      status: 'custom',
+      label: customLabel,
+      customLabel,
+      updatedAt: serverTimestamp(),
+      updatedBy: window.currentUser?.email || 'admin'
+    });
+    toast('Custom status "' + customLabel + '" → Live! ✓', 'success');
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+};
+
+function renderStudioPage() {
+  // Already rendered via subscription
+}
+
 // Update settings page on open
 document.addEventListener('DOMContentLoaded', () => {
   const emailEl = document.getElementById('qs-email');
   const roleEl  = document.getElementById('qs-role');
-  if (emailEl && currentUser) emailEl.textContent = currentUser.email;
-  if (roleEl  && currentRole) roleEl.textContent  = currentRole === 'main_admin' ? '★ Main Admin' : 'Admin';
+  if (emailEl && window.currentUser) emailEl.textContent = window.currentUser.email;
+  if (roleEl  && window.currentRole) roleEl.textContent  = window.currentRole === 'main_admin' ? '★ Main Admin' : 'Admin';
 });
 </script>
 </body>

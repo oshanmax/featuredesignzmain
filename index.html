@@ -728,7 +728,7 @@ footer{background:var(--bg1);border-top:1px solid var(--bdr);padding:56px 60px 3
 
     <div class="fcard fc-sm2">
       <div class="fc-lbl">Studio Status</div>
-      <div class="fc-val"><span class="avail-dot"></span><em style="color:var(--mint)">Available</em></div>
+      <div class="fc-val" id="hero-studio-status"><span class="avail-dot" id="hero-studio-dot"></span><em id="hero-studio-label" style="color:var(--mint)">Available</em></div>
     </div>
   </div>
 
@@ -807,7 +807,7 @@ footer{background:var(--bg1);border-top:1px solid var(--bdr);padding:56px 60px 3
 <section class="sec sec-alt" id="projects">
   <div class="sec-head rev">
     <div class="sec-tag">Our Portfolio</div>
-    <h2 class="sec-h">Our <em>Projects</em></h2>
+    <h2 class="sec-h">Completed <em>Projects</em></h2>
   </div>
 
   <!-- Filter Bar -->
@@ -1075,6 +1075,51 @@ function applyProjectFilter(f){
   } catch(e) { console.warn('Social links Firebase error:', e.message); }
 })();
 
+// ══════════════════════════════════════
+// STUDIO STATUS — Load from Firebase
+// ══════════════════════════════════════
+(async function loadStudioStatus() {
+  const STATUS_MAP = {
+    available:   { label:'Available',     color:'var(--mint)', dotColor:'var(--mint)' },
+    unavailable: { label:'Fully Booked',  color:'var(--red)',  dotColor:'var(--red)'  },
+    limited:     { label:'Limited Slots', color:'var(--gold)', dotColor:'var(--gold)' },
+    custom:      { label:'',              color:'var(--blue2)',dotColor:'var(--blue2)' },
+  };
+
+  function applyStudio(data) {
+    const status = data.status || 'available';
+    const s = STATUS_MAP[status] || STATUS_MAP['available'];
+    const label = status === 'custom' ? (data.customLabel || data.label || 'Custom') : s.label;
+    const color = s.color;
+
+    const dot   = document.getElementById('hero-studio-dot');
+    const lbl   = document.getElementById('hero-studio-label');
+    const dotStyle = document.querySelector('.avail-dot');
+
+    if (lbl) { lbl.textContent = label; lbl.style.color = color; }
+    if (dot) { dot.style.background = s.dotColor; dot.style.boxShadow = '0 0 8px ' + s.dotColor; }
+  }
+
+  try {
+    const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+    const { getFirestore, doc, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    const cfg = {
+      apiKey:"AIzaSyCuEypEeXI7TVvos_1tMZ1o50EtJtefb7M",
+      authDomain:"featuredesignzmain.firebaseapp.com",
+      projectId:"featuredesignzmain",
+      storageBucket:"featuredesignzmain.firebasestorage.app",
+      messagingSenderId:"307853117381",
+      appId:"1:307853117381:web:fe3cab5e9ef0667d98edac"
+    };
+    const appName = 'frontend-studio';
+    const app = getApps().find(a=>a.name===appName) || initializeApp(cfg, appName);
+    const db  = getFirestore(app);
+    onSnapshot(doc(db,'settings','studio'), snap => {
+      applyStudio(snap.exists() ? snap.data() : {});
+    });
+  } catch(e) { console.warn('Studio status Firebase error:', e.message); }
+})();
+
 // FORM — saves to Firestore database (shared across all admins)
 async function doForm(e){
   e.preventDefault();
@@ -1247,7 +1292,7 @@ async function doForm(e){
     ].filter(Boolean).join('');
 
     return `
-      <div class="pcard-dyn" data-cat="${esc(p.cat)}">
+      <div class="pcard pcard-dyn" data-cat="${esc(p.cat)}">
         <div class="pcard-thumb ${bg}">
           ${thumbContent}
           <div class="pcard-ov">${actions||'<span style="color:var(--txt3);font-family:JetBrains Mono,monospace;font-size:.65rem">No link</span>'}</div>
