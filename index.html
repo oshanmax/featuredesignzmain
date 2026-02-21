@@ -554,6 +554,57 @@ footer{background:var(--bg1);border-top:1px solid var(--bdr);padding:56px 60px 3
 .rev{opacity:0;transform:translateY(28px);transition:opacity .75s,transform .75s}
 .rev.in{opacity:1;transform:none}
 
+.pcard-skeleton{
+  background:var(--bg1);border:1px solid var(--bdr);aspect-ratio:1/1.1;
+  animation:shimmer 1.6s ease infinite;
+}
+@keyframes shimmer{0%,100%{opacity:.4}50%{opacity:.9}}
+.pcard-dyn{
+  background:var(--bg1);border:1px solid var(--bdr);overflow:hidden;
+  transition:transform .4s cubic-bezier(.34,1.56,.64,1),border-color .3s,box-shadow .4s;
+}
+.pcard-dyn:hover{transform:translateY(-8px);border-color:var(--bdr3);box-shadow:0 20px 60px rgba(82,130,255,.12)}
+.pcard-dyn .pcard-thumb{
+  aspect-ratio:16/9;position:relative;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;font-size:2.8rem;
+}
+.pcard-dyn .pcard-ov{
+  position:absolute;inset:0;background:rgba(2,5,16,.88);
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  opacity:0;transition:opacity .3s;flex-wrap:wrap;padding:10px;
+}
+.pcard-dyn:hover .pcard-ov{opacity:1}
+.pcard-btn{
+  font-family:'JetBrains Mono',monospace;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
+  border:1px solid var(--blue);color:var(--blue);padding:10px 22px;text-decoration:none;transition:all .25s;
+}
+.pcard-btn:hover{background:var(--blue);color:#020510}
+.pcard-dyn .pcard-body{padding:20px 22px}
+.pcard-dyn .pcard-cat{
+  font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.18em;
+  text-transform:uppercase;margin-bottom:7px;
+}
+.pcard-dyn .pcard-name{
+  font-family:'Bricolage Grotesque',sans-serif;font-weight:700;
+  font-size:1.05rem;letter-spacing:-.02em;margin-bottom:7px;
+}
+.pcard-dyn .pcard-desc{font-size:.82rem;color:var(--txt2);line-height:1.7}
+.pcard-dyn .pcard-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:13px}
+.ptag{
+  font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;
+  padding:3px 9px;background:var(--bg3);color:var(--txt3);
+}
+.proj-status-pill{
+  display:inline-flex;align-items:center;gap:5px;
+  font-family:'JetBrains Mono',monospace;font-size:.54rem;letter-spacing:.1em;text-transform:uppercase;
+  padding:3px 9px;margin-top:8px;
+}
+.psp-completed{background:rgba(62,240,184,.1);color:var(--mint);border:1px solid rgba(62,240,184,.25)}
+.psp-inprogress{background:rgba(82,130,255,.1);color:var(--blue2);border:1px solid rgba(82,130,255,.25)}
+.psp-update_soon{background:rgba(56,217,245,.1);color:var(--cyan);border:1px solid rgba(56,217,245,.25)}
+.psp-paused{background:rgba(74,88,128,.15);color:var(--txt3);border:1px solid rgba(74,88,128,.2)}
+.proj-img-wrap{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
+
 /* ── RESPONSIVE ── */
 @media(max-width:1100px){
   .hero{grid-template-columns:1fr}
@@ -756,8 +807,10 @@ footer{background:var(--bg1);border-top:1px solid var(--bdr);padding:56px 60px 3
 <section class="sec sec-alt" id="projects">
   <div class="sec-head rev">
     <div class="sec-tag">Our Portfolio</div>
-    <h2 class="sec-h">Completed <em>Projects</em></h2>
+    <h2 class="sec-h">Our <em>Projects</em></h2>
   </div>
+
+  <!-- Filter Bar -->
   <div class="pf-bar rev" id="fBar">
     <button class="pf on" data-f="all">All Work</button>
     <button class="pf" data-f="web">Web Dev</button>
@@ -765,20 +818,21 @@ footer{background:var(--bg1);border-top:1px solid var(--bdr);padding:56px 60px 3
     <button class="pf" data-f="design">Design</button>
     <button class="pf" data-f="video">Video</button>
   </div>
+
+  <!-- Dynamic Grid — loaded from Firebase -->
   <div class="p-grid" id="pGrid">
-    <div class="pcard rev" data-cat="web"><div class="pcard-thumb tb1"><span>🛒</span><div class="pcard-ov"><a href="#" class="pcard-btn">View Project</a></div></div><div class="pcard-body"><div class="pcard-cat cw">Web Development</div><div class="pcard-name">E-Commerce Platform</div><p class="pcard-desc">Full-featured online store with cart, payment gateway, admin dashboard, and real-time inventory.</p><div class="pcard-tags"><span class="ptag">React</span><span class="ptag">Node.js</span><span class="ptag">MongoDB</span><span class="ptag">Stripe</span></div></div></div>
-    <div class="pcard rev" data-cat="mobile"><div class="pcard-thumb tb2"><span>🍔</span><div class="pcard-ov"><a href="#" class="pcard-btn">View Project</a></div></div><div class="pcard-body"><div class="pcard-cat cm">Mobile App</div><div class="pcard-name">Food Delivery App</div><p class="pcard-desc">Cross-platform ordering app with real-time tracking, push notifications, and restaurant dashboard.</p><div class="pcard-tags"><span class="ptag">Flutter</span><span class="ptag">Firebase</span><span class="ptag">Google Maps</span></div></div></div>
-    <div class="pcard rev" data-cat="design"><div class="pcard-thumb tb3"><span>🎨</span><div class="pcard-ov"><a href="#" class="pcard-btn">View Project</a></div></div><div class="pcard-body"><div class="pcard-cat cd">Brand Identity</div><div class="pcard-name">Tech Startup Branding</div><p class="pcard-desc">Complete visual identity — logo, typography, color palette, business cards, and social media kit.</p><div class="pcard-tags"><span class="ptag">Illustrator</span><span class="ptag">Photoshop</span><span class="ptag">Figma</span></div></div></div>
-    <div class="pcard rev" data-cat="web"><div class="pcard-thumb tb1"><span>🏥</span><div class="pcard-ov"><a href="#" class="pcard-btn">View Project</a></div></div><div class="pcard-body"><div class="pcard-cat cw">Web Development</div><div class="pcard-name">Hospital Management System</div><p class="pcard-desc">Patient records, appointments, billing, and doctor portal — complete healthcare solution.</p><div class="pcard-tags"><span class="ptag">Laravel</span><span class="ptag">MySQL</span><span class="ptag">Vue.js</span></div></div></div>
-    <div class="pcard rev" data-cat="video"><div class="pcard-thumb tb4"><span>🎬</span><div class="pcard-ov"><a href="#" class="pcard-btn">View Project</a></div></div><div class="pcard-body"><div class="pcard-cat cv">Video Editing</div><div class="pcard-name">YouTube Channel Trailer</div><p class="pcard-desc">High-energy trailer with motion graphics, custom animations, and cinematic color grading.</p><div class="pcard-tags"><span class="ptag">Premiere Pro</span><span class="ptag">After Effects</span></div></div></div>
-    <div class="pcard rev" data-cat="mobile"><div class="pcard-thumb tb2"><span>💪</span><div class="pcard-ov"><a href="#" class="pcard-btn">View Project</a></div></div><div class="pcard-body"><div class="pcard-cat cm">Mobile App</div><div class="pcard-name">Fitness Tracker App</div><p class="pcard-desc">Workout planner, calorie tracker, progress charts, and social sharing for fitness lovers.</p><div class="pcard-tags"><span class="ptag">React Native</span><span class="ptag">Firebase</span><span class="ptag">Redux</span></div></div></div>
-    <div class="pcard rev" data-cat="design"><div class="pcard-thumb tb3"><span>☕</span><div class="pcard-ov"><a href="#" class="pcard-btn">View Project</a></div></div><div class="pcard-body"><div class="pcard-cat cd">Graphics Design</div><div class="pcard-name">Coffee Shop Social Kit</div><p class="pcard-desc">30-piece social media kit with templates, stories, highlights, and promotional banners.</p><div class="pcard-tags"><span class="ptag">Photoshop</span><span class="ptag">Canva Pro</span></div></div></div>
-    <div class="pcard rev" data-cat="web"><div class="pcard-thumb tb1"><span>📊</span><div class="pcard-ov"><a href="#" class="pcard-btn">View Project</a></div></div><div class="pcard-body"><div class="pcard-cat cw">Web Development</div><div class="pcard-name">Analytics Dashboard</div><p class="pcard-desc">Real-time KPI dashboard with live charts, team management, and automated PDF reports.</p><div class="pcard-tags"><span class="ptag">Next.js</span><span class="ptag">Chart.js</span><span class="ptag">PostgreSQL</span></div></div></div>
-    <div class="pcard rev" data-cat="video"><div class="pcard-thumb tb4"><span>🎵</span><div class="pcard-ov"><a href="#" class="pcard-btn">View Project</a></div></div><div class="pcard-body"><div class="pcard-cat cv">Video Editing</div><div class="pcard-name">Music Video Production</div><p class="pcard-desc">Full music video with VFX overlays, beat-synced cuts, color grading, and lyric animations.</p><div class="pcard-tags"><span class="ptag">Premiere Pro</span><span class="ptag">After Effects</span><span class="ptag">DaVinci</span></div></div></div>
+    <!-- Loading skeleton -->
+    <div class="pcard-skeleton"></div>
+    <div class="pcard-skeleton"></div>
+    <div class="pcard-skeleton"></div>
+  </div>
+
+  <div id="proj-empty-msg" style="display:none;text-align:center;padding:60px 20px;color:var(--txt3)">
+    <div style="font-size:2.5rem;margin-bottom:12px;opacity:.5">📁</div>
+    <div style="font-size:.88rem">No projects found.</div>
   </div>
 </section>
 
-<!-- PROCESS -->
 <section class="sec sec-alt2" id="process">
   <div class="sec-head rev">
     <div class="sec-tag">How We Work</div>
@@ -841,7 +895,7 @@ footer{background:var(--bg1);border-top:1px solid var(--bdr);padding:56px 60px 3
       <div class="c-info">
         <div class="c-card rev">
           <div class="c-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.63A2 2 0 012 0h3a2 2 0 012 1.72c.12 1.08.47 2.12.92 3.1a2 2 0 01-.45 2.11L6.91 8.49a16 16 0 006.59 6.59l1.56-1.56a2 2 0 012.11-.45c.98.45 2.02.8 3.1.92A2 2 0 0122 16.92z"/></svg></div>
-          <div><div class="c-lbl">Phone / WhatsApp</div><div class="c-val"><a href="tel:+94786675150">+94 786 675 150</a></div></div>
+          <div><div class="c-lbl">Phone / WhatsApp</div><div class="c-val"><a href="tel:+94786675150" id="ct-phone">+94 786 675 150</a></div></div>
         </div>
         <div class="c-card rev">
           <div class="c-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div>
@@ -854,12 +908,12 @@ footer{background:var(--bg1);border-top:1px solid var(--bdr);padding:56px 60px 3
       </div>
       <div class="soc-lbl">Find Us Online</div>
       <div class="soc-grid">
-        <a href="https://www.youtube.com/channel/UCda2mc_f-nIinjWpDUJiA2g" target="_blank" class="soc-a"><div class="soc-ic" style="color:#ff2020;border-color:rgba(255,32,32,.2)"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg></div><div><div class="soc-pl">YouTube</div><div class="soc-nm">Feature Designz</div></div></a>
-        <a href="https://www.facebook.com/featuredesignz" target="_blank" class="soc-a"><div class="soc-ic" style="color:#1877f2;border-color:rgba(24,119,242,.2)"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></div><div><div class="soc-pl">Facebook</div><div class="soc-nm">Feature Designz</div></div></a>
-        <a href="https://www.instagram.com/featuredesignz" target="_blank" class="soc-a"><div class="soc-ic" style="color:#e1306c;border-color:rgba(225,48,108,.2)"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></div><div><div class="soc-pl">Instagram</div><div class="soc-nm">@featuredesignz</div></div></a>
-        <a href="https://wa.me/94786675150" target="_blank" class="soc-a"><div class="soc-ic" style="color:#25d366;border-color:rgba(37,211,102,.2)"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></div><div><div class="soc-pl">WhatsApp</div><div class="soc-nm">+94 786 675 150</div></div></a>
-        <a href="https://www.tiktok.com/@featuredesignz" target="_blank" class="soc-a"><div class="soc-ic" style="color:#fff;border-color:rgba(255,255,255,.1);background:#010101"><svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.19 8.19 0 004.77 1.52V6.73a4.85 4.85 0 01-1-.04z"/></svg></div><div><div class="soc-pl">TikTok</div><div class="soc-nm">@featuredesignz</div></div></a>
-        <a href="https://x.com/featuredesignz" target="_blank" class="soc-a"><div class="soc-ic" style="color:#fff;border-color:rgba(255,255,255,.15);background:#000"><svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.258 5.626 5.906-5.626zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></div><div><div class="soc-pl">X (Twitter)</div><div class="soc-nm">@featuredesignz</div></div></a>
+        <a href="https://www.youtube.com/channel/UCda2mc_f-nIinjWpDUJiA2g" target="_blank" class="soc-a" id="sl-yt"><div class="soc-ic" style="color:#ff2020;border-color:rgba(255,32,32,.2)"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg></div><div><div class="soc-pl">YouTube</div><div class="soc-nm">Feature Designz</div></div></a>
+        <a href="https://www.facebook.com/featuredesignz" target="_blank" class="soc-a" id="sl-fb"><div class="soc-ic" style="color:#1877f2;border-color:rgba(24,119,242,.2)"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></div><div><div class="soc-pl">Facebook</div><div class="soc-nm">Feature Designz</div></div></a>
+        <a href="https://www.instagram.com/featuredesignz" target="_blank" class="soc-a" id="sl-ig"><div class="soc-ic" style="color:#e1306c;border-color:rgba(225,48,108,.2)"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></div><div><div class="soc-pl">Instagram</div><div class="soc-nm">@featuredesignz</div></div></a>
+        <a href="https://wa.me/94786675150" target="_blank" class="soc-a" id="sl-wa"><div class="soc-ic" style="color:#25d366;border-color:rgba(37,211,102,.2)"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></div><div><div class="soc-pl">WhatsApp</div><div class="soc-nm">+94 786 675 150</div></div></a>
+        <a href="https://www.tiktok.com/@featuredesignz" target="_blank" class="soc-a" id="sl-tt"><div class="soc-ic" style="color:#fff;border-color:rgba(255,255,255,.1);background:#010101"><svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.19 8.19 0 004.77 1.52V6.73a4.85 4.85 0 01-1-.04z"/></svg></div><div><div class="soc-pl">TikTok</div><div class="soc-nm">@featuredesignz</div></div></a>
+        <a href="https://x.com/featuredesignz" target="_blank" class="soc-a" id="sl-tw"><div class="soc-ic" style="color:#fff;border-color:rgba(255,255,255,.15);background:#000"><svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.258 5.626 5.906-5.626zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></div><div><div class="soc-pl">X (Twitter)</div><div class="soc-nm">@featuredesignz</div></div></a>
       </div>
     </div>
 
@@ -920,10 +974,10 @@ footer{background:var(--bg1);border-top:1px solid var(--bdr);padding:56px 60px 3
   <div class="ft-bot">
     <div class="ft-copy">© 2025 <em>Feature Designz</em>. Built with passion in Sri Lanka 🇱🇰</div>
     <div class="ft-ics">
-      <a href="https://www.youtube.com/channel/UCda2mc_f-nIinjWpDUJiA2g" target="_blank" class="ft-ic"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg></a>
-      <a href="https://www.instagram.com/featuredesignz" target="_blank" class="ft-ic"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>
-      <a href="https://www.facebook.com/featuredesignz" target="_blank" class="ft-ic"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>
-      <a href="https://wa.me/94786675150" target="_blank" class="ft-ic"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></a>
+      <a href="https://www.youtube.com/channel/UCda2mc_f-nIinjWpDUJiA2g" target="_blank" class="ft-ic" id="ft-yt"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg></a>
+      <a href="https://www.instagram.com/featuredesignz" target="_blank" class="ft-ic" id="ft-ig"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>
+      <a href="https://www.facebook.com/featuredesignz" target="_blank" class="ft-ic" id="ft-fb"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>
+      <a href="https://wa.me/94786675150" target="_blank" class="ft-ic" id="ft-wa"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></a>
     </div>
   </div>
 </footer>
@@ -951,23 +1005,75 @@ window.addEventListener('scroll',()=>{
   document.querySelector('nav').style.background=y>60?'rgba(2,5,16,0.97)':'rgba(2,5,16,0.82)';
 });
 
-// FILTER
+// FILTER — works with dynamic Firebase cards
+let _activeFilter = 'all';
 document.getElementById('fBar').addEventListener('click',e=>{
   if(!e.target.classList.contains('pf'))return;
   document.querySelectorAll('.pf').forEach(b=>b.classList.remove('on'));
   e.target.classList.add('on');
-  const f=e.target.dataset.f;
-  document.querySelectorAll('.pcard').forEach(c=>{
-    const show=f==='all'||c.dataset.cat===f;
+  _activeFilter = e.target.dataset.f;
+  applyProjectFilter(_activeFilter);
+});
+function applyProjectFilter(f){
+  document.querySelectorAll('.pcard-dyn').forEach(c=>{
+    const show = f==='all' || c.dataset.cat===f;
     if(show){
-      c.style.display='block';c.style.opacity='0';c.style.transform='translateY(14px)';
-      requestAnimationFrame(()=>setTimeout(()=>{c.style.transition='opacity .4s,transform .4s,border-color .3s,box-shadow .4s';c.style.opacity='1';c.style.transform='none'},20));
-    }else{
+      c.style.display='';c.style.opacity='0';c.style.transform='translateY(12px)';
+      requestAnimationFrame(()=>setTimeout(()=>{
+        c.style.transition='opacity .4s,transform .4s,border-color .3s,box-shadow .4s';
+        c.style.opacity='1';c.style.transform='none';
+      },20));
+    } else {
       c.style.transition='opacity .2s';c.style.opacity='0';
       setTimeout(()=>c.style.display='none',220);
     }
   });
-});
+}
+
+// ══════════════════════════════════════
+// SOCIAL LINKS — Load from Firebase
+// ══════════════════════════════════════
+(async function loadSocialLinks() {
+  function applyLinks(data) {
+    const set = (id, href) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (href) { el.href = href; el.style.display = ''; }
+      else el.style.display = 'none';
+    };
+    const wa = data.whatsapp ? 'https://wa.me/' + String(data.whatsapp).replace(/[^0-9]/g,'') : '';
+    set('sl-yt', data.youtube);
+    set('sl-fb', data.facebook);
+    set('sl-ig', data.instagram);
+    set('sl-wa', wa);
+    set('sl-tt', data.tiktok);
+    set('sl-tw', data.twitter);
+    set('ft-yt', data.youtube);
+    set('ft-ig', data.instagram);
+    set('ft-fb', data.facebook);
+    set('ft-wa', wa);
+    const ytBtn = document.getElementById('yt-subscribe-btn');
+    if (ytBtn && data.youtube) ytBtn.href = data.youtube;
+  }
+  try {
+    const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+    const { getFirestore, doc, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    const cfg = {
+      apiKey:"AIzaSyCuEypEeXI7TVvos_1tMZ1o50EtJtefb7M",
+      authDomain:"featuredesignzmain.firebaseapp.com",
+      projectId:"featuredesignzmain",
+      storageBucket:"featuredesignzmain.firebasestorage.app",
+      messagingSenderId:"307853117381",
+      appId:"1:307853117381:web:fe3cab5e9ef0667d98edac"
+    };
+    const appName = 'frontend-social';
+    const app = getApps().find(a => a.name === appName) || initializeApp(cfg, appName);
+    const db  = getFirestore(app);
+    onSnapshot(doc(db, 'settings', 'social'), snap => {
+      if (snap.exists()) applyLinks(snap.data());
+    });
+  } catch(e) { console.warn('Social links Firebase error:', e.message); }
+})();
 
 // FORM — saves to Firestore database (shared across all admins)
 async function doForm(e){
@@ -1101,6 +1207,122 @@ async function doForm(e){
   } catch(e) {
     console.warn('Service status: Firebase not available, using defaults.', e.message);
     // Defaults already set above
+  }
+})();
+
+// ══════════════════════════════════════
+// PROJECTS — Load from Firebase (real-time)
+// ══════════════════════════════════════
+(async function loadProjects() {
+  const CAT_LABEL = { web:'Web Dev', mobile:'Mobile App', design:'Graphics Design', video:'Video Editing' };
+  const CAT_COL   = { web:'cw', mobile:'cm', design:'cd', video:'cv' };
+  const BG_MAP    = { web:'tb1', mobile:'tb2', design:'tb3', video:'tb4' };
+  const STATUS_PILL = {
+    completed:   { cls:'psp-completed',   icon:'✓', label:'Completed'   },
+    inprogress:  { cls:'psp-inprogress',  icon:'⟳', label:'In Progress' },
+    update_soon: { cls:'psp-update_soon', icon:'🔄', label:'Update Soon' },
+    paused:      { cls:'psp-paused',      icon:'⏸', label:'Paused'      },
+  };
+
+  function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function buildCard(p) {
+    const bg   = BG_MAP[p.cat]   || 'tb1';
+    const col  = CAT_COL[p.cat]  || 'cw';
+    const cat  = CAT_LABEL[p.cat]|| p.cat || '';
+    const tags = (p.tags||[]).slice(0,4).map(t=>`<span class="ptag">${esc(t)}</span>`).join('');
+    const pill = p.status && p.status !== 'completed' ? STATUS_PILL[p.status] : null;
+    const pillHtml = pill
+      ? `<div class="proj-status-pill ${pill.cls}">${pill.icon} ${pill.label}</div>`
+      : (p.status==='completed'||p.progress>=100 ? `<div class="proj-status-pill psp-completed">✓ Completed</div>` : '');
+
+    // Image or emoji thumb
+    const thumbContent = p.imageUrl
+      ? `<img src="${esc(p.imageUrl)}" class="proj-img-wrap" alt="${esc(p.name)}" loading="lazy" onerror="this.parentElement.innerHTML='<span style=\'font-size:2.8rem\'>${esc(p.emoji||'📁')}</span>'">`
+      : `<span style="font-size:2.8rem">${esc(p.emoji||'📁')}</span>`;
+
+    const actions = [
+      p.url      ? `<a href="${esc(p.url)}" target="_blank" class="pcard-btn">View Live</a>` : '',
+      p.githubUrl? `<a href="${esc(p.githubUrl)}" target="_blank" class="pcard-btn" style="border-color:var(--mint);color:var(--mint)">GitHub</a>` : ''
+    ].filter(Boolean).join('');
+
+    return `
+      <div class="pcard-dyn" data-cat="${esc(p.cat)}">
+        <div class="pcard-thumb ${bg}">
+          ${thumbContent}
+          <div class="pcard-ov">${actions||'<span style="color:var(--txt3);font-family:JetBrains Mono,monospace;font-size:.65rem">No link</span>'}</div>
+        </div>
+        <div class="pcard-body">
+          <div class="pcard-cat ${col}">${esc(cat)}</div>
+          <div class="pcard-name">${esc(p.name)}</div>
+          <p class="pcard-desc">${esc(p.desc)}</p>
+          ${pillHtml}
+          <div class="pcard-tags">${tags}</div>
+        </div>
+      </div>`;
+  }
+
+  function renderGrid(projects) {
+    const grid = document.getElementById('pGrid');
+    const emptyMsg = document.getElementById('proj-empty-msg');
+    if (!grid) return;
+
+    // Filter out hidden (off) projects
+    const visible = projects.filter(p => p.status !== 'off' && p.display !== false);
+
+    if (!visible.length) {
+      grid.innerHTML = '';
+      if (emptyMsg) emptyMsg.style.display = 'block';
+      return;
+    }
+    if (emptyMsg) emptyMsg.style.display = 'none';
+
+    grid.innerHTML = visible.map(buildCard).join('');
+
+    // Re-apply active filter
+    if (typeof applyProjectFilter === 'function') {
+      applyProjectFilter(window._activeFilter || 'all');
+    }
+
+    // Animate cards in
+    grid.querySelectorAll('.pcard-dyn').forEach((c,i) => {
+      c.style.opacity = '0';
+      c.style.transform = 'translateY(20px)';
+      setTimeout(() => {
+        c.style.transition = 'opacity .5s, transform .5s';
+        c.style.opacity = '1';
+        c.style.transform = 'none';
+      }, i * 80);
+    });
+  }
+
+  try {
+    const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+    const { getFirestore, collection, query, orderBy, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+
+    const cfg = {
+      apiKey:"AIzaSyCuEypEeXI7TVvos_1tMZ1o50EtJtefb7M",
+      authDomain:"featuredesignzmain.firebaseapp.com",
+      projectId:"featuredesignzmain",
+      storageBucket:"featuredesignzmain.firebasestorage.app",
+      messagingSenderId:"307853117381",
+      appId:"1:307853117381:web:fe3cab5e9ef0667d98edac"
+    };
+
+    const appName = 'frontend-proj';
+    const app = getApps().find(a=>a.name===appName) || initializeApp(cfg, appName);
+    const db  = getFirestore(app);
+
+    const q = query(collection(db,'projects'), orderBy('createdAt','desc'));
+    onSnapshot(q, snap => {
+      const projects = snap.docs.map(d=>({id:d.id,...d.data()}));
+      renderGrid(projects);
+    });
+
+  } catch(e) {
+    console.warn('Projects Firebase error:', e.message);
+    const grid = document.getElementById('pGrid');
+    if (grid) grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--txt3)"><div style="font-size:2rem;margin-bottom:10px">📁</div><div>Add projects from the admin panel</div></div>';
   }
 })();
 
