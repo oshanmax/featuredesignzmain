@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Feature Designz — We Bring Ideas to Life</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Manrope:wght@300;400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════
+   TOKENS
+══════════════════════════════════════════ */
+:root {
+  --ink:     #04080f;
+  --navy:    #07112a;
+  --deep:    #0b1a3f;
+  --mid:     #112356;
+  --steel:   #1a3272;
+  --border:  rgba(100,149,237,0.12);
+  --border2: rgba(100,149,237,0.22);
+  --electric:#4f8ef7;
+  --sky:     #7eb8ff;
+  --ice:     #b8d8ff;
+  --gold:    #f0c060;
+  --coral:   #f07060;
+  --mint:    #60e0b8;
+  --white:   #f0f4ff;
+  --muted:   #6b80a8;
+  --glow-e:  rgba(79,142,247,0.25);
+  --glow-g:  rgba(240,192,96,0.2);
+}
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; font-size:16px; }
+body {
+  font-family:'Manrope', sans-serif;
+  background:var(--ink);
+  color:var(--white);
+  overflow-x:hidden;
+  cursor:default;
+}
+
+/* noise grain */
+body::after {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:9000;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23g)' opacity='0.03'/%3E%3C/svg%3E");
+  opacity:.5;
+}
+
+/* ══════════════════════════════════════════
+   NAV
+══════════════════════════════════════════ */
+nav {
+  position:fixed; top:0; left:0; right:0; z-index:5000;
+  height:72px;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 64px;
+  background:rgba(4,8,15,0.85);
+  backdrop-filter:blur(28px);
+  border-bottom:1px solid var(--border);
+}
+.nav-logo {
+  display:flex; align-items:center; gap:12px;
+  text-decoration:none;
+}
+.nav-logo-mark {
+  width:36px; height:36px;
+  background:var(--electric);
+  display:flex; align-items:center; justify-content:center;
+  position:relative;
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+}
+.nav-logo-mark::after {
+  content:'F';
+  font-family:'Playfair Display',serif;
+  font-weight:900; font-size:1.1rem;
+  color:var(--ink);
+}
+.nav-logo-text {
+  font-family:'Playfair Display',serif;
+  font-weight:700; font-size:1.25rem;
+  letter-spacing:-.01em; color:var(--white);
+}
+.nav-logo-text em { color:var(--electric); font-style:normal; }
+
+.nav-links {
+  display:flex; gap:40px; list-style:none;
+  align-items:center;
+}
+.nav-links a {
+  font-family:'Space Mono',monospace;
+  font-size:.72rem; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--muted); text-decoration:none; transition:color .3s;
+  position:relative;
+}
+.nav-links a::after {
+  content:''; position:absolute; bottom:-4px; left:0;
+  width:0; height:1px;
+  background:linear-gradient(90deg,var(--electric),var(--gold));
+  transition:width .3s;
+}
+.nav-links a:hover { color:var(--white); }
+.nav-links a:hover::after { width:100%; }
+
+.nav-btn {
+  font-family:'Manrope',sans-serif; font-weight:700; font-size:.82rem;
+  letter-spacing:.04em;
+  padding:10px 26px;
+  background:transparent;
+  border:1.5px solid var(--electric);
+  color:var(--electric);
+  text-decoration:none;
+  position:relative; overflow:hidden;
+  transition:color .35s;
+}
+.nav-btn::before {
+  content:''; position:absolute; inset:0;
+  background:var(--electric);
+  transform:scaleX(0); transform-origin:left;
+  transition:transform .35s cubic-bezier(.77,0,.18,1);
+  z-index:-1;
+}
+.nav-btn:hover { color:var(--ink); }
+.nav-btn:hover::before { transform:scaleX(1); }
+
+/* ══════════════════════════════════════════
+   LOADER
+══════════════════════════════════════════ */
+#loader {
+  position:fixed; inset:0; z-index:99999;
+  background:var(--ink);
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:24px;
+  transition:opacity .8s ease, visibility .8s ease;
+}
+#loader.out { opacity:0; visibility:hidden; }
+.ld-logo {
+  font-family:'Playfair Display',serif;
+  font-weight:900; font-size:2.4rem;
+  letter-spacing:-.03em; color:var(--white);
+}
+.ld-logo em { color:var(--electric); font-style:normal; }
+.ld-bar-wrap { width:220px; height:2px; background:var(--steel); overflow:hidden; }
+.ld-bar { height:100%; width:0; background:linear-gradient(90deg,var(--electric),var(--gold)); animation:ldGo 1.8s ease forwards; }
+@keyframes ldGo { 0%{width:0} 100%{width:100%} }
+.ld-txt { font-family:'Space Mono',monospace; font-size:.65rem; letter-spacing:.3em; text-transform:uppercase; color:var(--muted); }
+
+/* ══════════════════════════════════════════
+   HERO
+══════════════════════════════════════════ */
+.hero {
+  min-height:100vh;
+  display:grid; grid-template-columns:1fr 1fr;
+  align-items:center;
+  padding:110px 64px 80px;
+  position:relative; overflow:hidden;
+  gap:60px;
+}
+
+/* background layers */
+.hero-bg {
+  position:absolute; inset:0; pointer-events:none;
+  background:
+    radial-gradient(ellipse 60% 80% at 80% 50%, rgba(79,142,247,0.07) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 60% at 10% 80%, rgba(96,224,184,0.05) 0%, transparent 60%);
+}
+.hero-grid-bg {
+  position:absolute; inset:0; pointer-events:none;
+  background-image:
+    linear-gradient(rgba(79,142,247,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(79,142,247,0.05) 1px, transparent 1px);
+  background-size:72px 72px;
+  mask-image:radial-gradient(ellipse 80% 90% at 50% 50%, black, transparent);
+}
+
+/* left text */
+.hero-left { position:relative; z-index:2; }
+
+.hero-eyebrow {
+  display:inline-flex; align-items:center; gap:10px;
+  font-family:'Space Mono',monospace;
+  font-size:.68rem; letter-spacing:.22em; text-transform:uppercase;
+  color:var(--electric);
+  padding:8px 18px;
+  border:1px solid rgba(79,142,247,0.3);
+  background:rgba(79,142,247,0.06);
+  margin-bottom:32px;
+  opacity:0; animation:fadeUp .7s .3s forwards;
+}
+.eyebrow-pulse {
+  width:6px; height:6px; border-radius:50%;
+  background:var(--electric);
+  animation:pulse 2s ease infinite;
+  box-shadow:0 0 8px var(--electric);
+}
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
+
+.hero-h1 {
+  font-family:'Playfair Display',serif;
+  font-weight:900;
+  font-size:clamp(3rem, 5.5vw, 5.8rem);
+  line-height:.96; letter-spacing:-.03em;
+  margin-bottom:24px;
+  opacity:0; animation:fadeUp .8s .5s forwards;
+}
+.hero-h1 .italic { font-style:italic; color:var(--electric); display:block; }
+.hero-h1 .outline {
+  -webkit-text-stroke:1.5px rgba(79,142,247,0.4);
+  color:transparent; display:block;
+}
+
+.hero-sub {
+  font-size:1rem; line-height:1.8; color:var(--muted);
+  font-weight:400; max-width:440px;
+  margin-bottom:44px;
+  opacity:0; animation:fadeUp .8s .7s forwards;
+}
+.hero-sub strong { color:var(--sky); font-weight:600; }
+
+.hero-ctas {
+  display:flex; gap:16px; align-items:center;
+  flex-wrap:wrap;
+  opacity:0; animation:fadeUp .8s .9s forwards;
+}
+.cta-primary {
+  font-family:'Manrope',sans-serif; font-weight:700; font-size:.9rem;
+  padding:16px 40px;
+  background:var(--electric); color:var(--ink);
+  text-decoration:none;
+  position:relative; overflow:hidden;
+  transition:box-shadow .3s;
+}
+.cta-primary::before {
+  content:''; position:absolute; inset:0;
+  background:var(--gold);
+  transform:translateX(-101%); transition:transform .4s cubic-bezier(.77,0,.18,1);
+  z-index:0;
+}
+.cta-primary span { position:relative; z-index:1; }
+.cta-primary:hover::before { transform:translateX(0); }
+.cta-primary:hover { box-shadow:0 12px 40px rgba(79,142,247,.35); }
+
+.cta-secondary {
+  font-family:'Space Mono',monospace; font-size:.72rem;
+  letter-spacing:.1em; text-transform:uppercase;
+  color:var(--muted); text-decoration:none;
+  display:flex; align-items:center; gap:10px;
+  transition:color .3s;
+}
+.cta-secondary:hover { color:var(--white); }
+.cta-arrow { transition:transform .3s; }
+.cta-secondary:hover .cta-arrow { transform:translateX(5px); }
+
+/* right visual */
+.hero-right {
+  position:relative; z-index:2;
+  opacity:0; animation:fadeRight .9s .7s forwards;
+}
+@keyframes fadeRight { from{opacity:0;transform:translateX(40px)} to{opacity:1;transform:translateX(0)} }
+
+.hero-card-stack { position:relative; height:480px; }
+
+.h-card {
+  position:absolute;
+  background:var(--navy);
+  border:1px solid var(--border);
+  padding:32px;
+  transition:transform .3s;
+}
+.h-card-main {
+  width:100%; height:320px;
+  top:0; left:0;
+  background:linear-gradient(135deg,var(--deep),var(--mid));
+  border-color:var(--border2);
+  display:flex; flex-direction:column;
+  justify-content:space-between;
+  overflow:hidden;
+}
+.h-card-main::before {
+  content:''; position:absolute; top:-80px; right:-80px;
+  width:240px; height:240px;
+  background:radial-gradient(circle,rgba(79,142,247,.18),transparent 70%);
+  pointer-events:none;
+}
+
+.hc-badge {
+  display:inline-flex; align-items:center; gap:8px;
+  font-family:'Space Mono',monospace; font-size:.62rem;
+  letter-spacing:.15em; text-transform:uppercase;
+  color:var(--electric);
+  background:rgba(79,142,247,.1); border:1px solid rgba(79,142,247,.25);
+  padding:6px 14px; width:fit-content;
+}
+.hc-title {
+  font-family:'Playfair Display',serif;
+  font-weight:700; font-size:1.6rem;
+  line-height:1.2; color:var(--white);
+  margin:auto 0;
+}
+.hc-metrics {
+  display:flex; gap:24px;
+}
+.hc-m { }
+.hc-m-n {
+  font-family:'Playfair Display',serif;
+  font-weight:700; font-size:1.8rem; line-height:1;
+  color:var(--white);
+}
+.hc-m-n em { color:var(--electric); font-style:normal; }
+.hc-m-l {
+  font-family:'Space Mono',monospace; font-size:.56rem;
+  letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin-top:3px;
+}
+
+.h-card-sm1 {
+  width:200px;
+  bottom:80px; right:-30px;
+  background:var(--deep); border-color:var(--border2);
+  padding:20px 22px;
+  box-shadow:0 20px 60px rgba(0,0,0,.4);
+}
+.h-card-sm2 {
+  width:180px;
+  bottom:0; left:20px;
+  background:linear-gradient(135deg,var(--mid),var(--steel));
+  border-color:rgba(240,192,96,.2);
+  padding:18px 20px;
+  box-shadow:0 20px 60px rgba(0,0,0,.3);
+}
+.h-sm-label {
+  font-family:'Space Mono',monospace; font-size:.58rem;
+  letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin-bottom:8px;
+}
+.h-sm-val {
+  font-family:'Playfair Display',serif; font-weight:700; font-size:1.2rem; color:var(--white);
+}
+.h-sm-val em { color:var(--gold); font-style:normal; }
+.h-sm-dot {
+  display:inline-block; width:8px; height:8px; border-radius:50%;
+  background:var(--mint); margin-right:6px;
+  box-shadow:0 0 8px var(--mint); animation:pulse 1.8s ease infinite;
+}
+
+.hero-scroll {
+  position:absolute; bottom:40px; left:64px;
+  display:flex; align-items:center; gap:12px;
+  font-family:'Space Mono',monospace; font-size:.6rem; letter-spacing:.2em; text-transform:uppercase; color:var(--muted);
+  opacity:0; animation:fadeUp .7s 1.3s forwards;
+}
+.scroll-track { width:1px; height:44px; background:var(--border2); overflow:hidden; position:relative; }
+.scroll-track::after {
+  content:''; position:absolute; top:-100%; left:0; right:0; height:100%;
+  background:linear-gradient(transparent,var(--electric));
+  animation:scrollTrack 2s ease infinite;
+}
+@keyframes scrollTrack { 0%{top:-100%} 100%{top:100%} }
+
+@keyframes fadeUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
+
+/* ══════════════════════════════════════════
+   MARQUEE
+══════════════════════════════════════════ */
+.mq {
+  border-top:1px solid var(--border); border-bottom:1px solid var(--border);
+  background:var(--navy); overflow:hidden; padding:16px 0;
+}
+.mq-inner { display:flex; gap:64px; width:max-content; animation:mq 30s linear infinite; }
+.mq-inner:hover { animation-play-state:paused; }
+.mq-i {
+  display:flex; align-items:center; gap:20px; white-space:nowrap;
+  font-family:'Space Mono',monospace; font-size:.7rem; letter-spacing:.16em; text-transform:uppercase; color:var(--muted);
+}
+.mq-star { font-size:1rem; }
+.mq-star.e { color:var(--electric); }
+.mq-star.g { color:var(--gold); }
+.mq-star.m { color:var(--mint); }
+@keyframes mq { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+
+/* ══════════════════════════════════════════
+   SECTION BASE
+══════════════════════════════════════════ */
+.section { padding:120px 64px; }
+.section-alt { background:var(--navy); }
+.section-alt2 { background:var(--deep); }
+
+.section-label {
+  display:flex; align-items:center; gap:12px;
+  font-family:'Space Mono',monospace; font-size:.65rem; letter-spacing:.22em; text-transform:uppercase;
+  color:var(--electric); margin-bottom:18px;
+}
+.section-label::before { content:''; width:32px; height:1px; background:var(--electric); }
+
+.section-title {
+  font-family:'Playfair Display',serif;
+  font-weight:900;
+  font-size:clamp(2.2rem,4vw,3.6rem);
+  line-height:1.04; letter-spacing:-.03em;
+}
+.section-title em { font-style:italic; color:var(--electric); }
+
+.section-head { margin-bottom:72px; }
+
+/* ══════════════════════════════════════════
+   SERVICES
+══════════════════════════════════════════ */
+.svc-grid {
+  display:grid; grid-template-columns:repeat(3,1fr);
+  gap:1px; background:var(--border);
+}
+.svc {
+  background:var(--ink);
+  padding:52px 44px;
+  position:relative; overflow:hidden;
+  transition:background .4s;
+}
+.svc:hover { background:var(--deep); }
+.svc-glow {
+  position:absolute; top:0; left:0; right:0; height:2px;
+  transform:scaleX(0); transform-origin:left;
+  transition:transform .5s cubic-bezier(.77,0,.18,1);
+}
+.svc:hover .svc-glow { transform:scaleX(1); }
+.svc:nth-child(1) .svc-glow { background:linear-gradient(90deg,var(--electric),var(--sky)); }
+.svc:nth-child(2) .svc-glow { background:linear-gradient(90deg,var(--gold),var(--coral)); }
+.svc:nth-child(3) .svc-glow { background:linear-gradient(90deg,var(--mint),var(--electric)); }
+.svc:nth-child(4) .svc-glow { background:linear-gradient(90deg,var(--coral),var(--gold)); }
+
+.svc-num {
+  font-family:'Playfair Display',serif; font-style:italic;
+  font-size:3.5rem; font-weight:900; line-height:1;
+  color:transparent; -webkit-text-stroke:1px rgba(79,142,247,.15);
+  margin-bottom:24px;
+}
+.svc-icon { margin-bottom:20px; }
+.svc-name {
+  font-family:'Playfair Display',serif; font-weight:700;
+  font-size:1.5rem; letter-spacing:-.02em; margin-bottom:14px;
+}
+.svc-desc { font-size:.88rem; color:var(--muted); line-height:1.85; font-weight:400; }
+.svc-tags { display:flex; flex-wrap:wrap; gap:8px; margin-top:24px; }
+.stag {
+  font-family:'Space Mono',monospace; font-size:.58rem;
+  letter-spacing:.1em; text-transform:uppercase;
+  padding:5px 12px; border:1px solid var(--border); color:var(--muted);
+  transition:all .25s;
+}
+.svc:hover .stag { border-color:rgba(79,142,247,.3); color:var(--sky); }
+
+/* ══════════════════════════════════════════
+   PROJECTS
+══════════════════════════════════════════ */
+.proj-filters {
+  display:flex; gap:10px; flex-wrap:wrap; margin-bottom:52px;
+}
+.pf {
+  font-family:'Space Mono',monospace; font-size:.65rem;
+  letter-spacing:.12em; text-transform:uppercase;
+  padding:9px 22px; border:1px solid var(--border);
+  background:transparent; color:var(--muted); cursor:pointer; transition:all .25s;
+}
+.pf:hover,.pf.on { border-color:var(--electric); color:var(--electric); background:rgba(79,142,247,.07); }
+
+.proj-grid {
+  display:grid; grid-template-columns:repeat(3,1fr); gap:20px;
+}
+.pcard {
+  background:var(--navy); border:1px solid var(--border);
+  overflow:hidden; transition:transform .4s cubic-bezier(.34,1.56,.64,1), border-color .3s;
+}
+.pcard:hover { transform:translateY(-8px); border-color:rgba(79,142,247,.45); }
+.pcard-thumb {
+  aspect-ratio:16/9; display:flex; align-items:center; justify-content:center;
+  font-size:3rem; position:relative; overflow:hidden;
+}
+.pcard-ov {
+  position:absolute; inset:0; background:rgba(4,8,15,.85);
+  display:flex; align-items:center; justify-content:center;
+  opacity:0; transition:opacity .35s;
+}
+.pcard:hover .pcard-ov { opacity:1; }
+.pcard-link {
+  font-family:'Space Mono',monospace; font-size:.68rem; letter-spacing:.12em; text-transform:uppercase;
+  border:1px solid var(--electric); color:var(--electric); padding:10px 22px;
+  text-decoration:none; transition:all .25s;
+}
+.pcard-link:hover { background:var(--electric); color:var(--ink); }
+.pcard-body { padding:22px 24px; }
+.pcard-cat {
+  font-family:'Space Mono',monospace; font-size:.58rem; letter-spacing:.18em;
+  text-transform:uppercase; margin-bottom:8px;
+}
+.c-web{color:var(--electric)} .c-mobile{color:var(--sky)} .c-design{color:var(--gold)} .c-video{color:var(--coral)} .c-brand{color:var(--mint)}
+.pcard-name {
+  font-family:'Playfair Display',serif; font-weight:700;
+  font-size:1.1rem; letter-spacing:-.01em; margin-bottom:8px;
+}
+.pcard-desc { font-size:.82rem; color:var(--muted); line-height:1.7; }
+.pcard-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:14px; }
+.ptag {
+  font-family:'Space Mono',monospace; font-size:.56rem; letter-spacing:.1em; text-transform:uppercase;
+  padding:4px 10px; background:var(--deep); color:var(--muted);
+}
+
+.tb1 { background:linear-gradient(135deg,#07112a,#0d254e,#07112a); }
+.tb2 { background:linear-gradient(135deg,#07112a,#1a0a2e,#07112a); }
+.tb3 { background:linear-gradient(135deg,#07112a,#1c1a08,#07112a); }
+.tb4 { background:linear-gradient(135deg,#07112a,#280e0e,#07112a); }
+.tb5 { background:linear-gradient(135deg,#07112a,#08241c,#07112a); }
+
+/* ══════════════════════════════════════════
+   PROCESS
+══════════════════════════════════════════ */
+.proc-row {
+  display:grid; grid-template-columns:repeat(4,1fr);
+  gap:0; position:relative;
+}
+.proc-line {
+  position:absolute; top:44px; left:12%; right:12%; height:1px;
+  background:linear-gradient(90deg,transparent,var(--electric),var(--gold),var(--mint),transparent);
+  opacity:.2;
+}
+.proc-item {
+  padding:48px 36px 40px;
+  border-right:1px solid var(--border);
+}
+.proc-item:last-child { border-right:none; }
+.proc-num {
+  font-family:'Playfair Display',serif; font-style:italic; font-weight:900;
+  font-size:4rem; line-height:1; color:transparent;
+  -webkit-text-stroke:1px rgba(79,142,247,.13); margin-bottom:16px;
+}
+.proc-dot {
+  width:10px; height:10px; border-radius:50%; margin-bottom:20px; position:relative; z-index:2;
+}
+.proc-name {
+  font-family:'Playfair Display',serif; font-weight:700;
+  font-size:1.1rem; margin-bottom:10px;
+}
+.proc-desc { font-size:.84rem; color:var(--muted); line-height:1.8; }
+
+/* ══════════════════════════════════════════
+   YOUTUBE
+══════════════════════════════════════════ */
+.yt-layout { display:grid; grid-template-columns:1.1fr 1fr; gap:80px; align-items:center; }
+.yt-frame-outer { position:relative; }
+.yt-frame {
+  aspect-ratio:16/9; background:var(--mid); border:1px solid var(--border2);
+  overflow:hidden; position:relative;
+}
+.yt-frame iframe { width:100%; height:100%; border:none; }
+.yt-frame-accent {
+  position:absolute; bottom:0; left:0; right:0; height:3px;
+  background:linear-gradient(90deg,var(--electric),var(--gold),var(--mint));
+}
+.yt-pill {
+  display:inline-flex; align-items:center; gap:12px;
+  background:var(--deep); border:1px solid var(--border); padding:14px 22px;
+  margin-top:20px;
+}
+.yt-pill-ch { font-family:'Playfair Display',serif; font-weight:700; font-size:1rem; }
+.yt-pill-sub { font-family:'Space Mono',monospace; font-size:.6rem; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin-top:2px; }
+
+.yt-content-label { margin-bottom:16px; }
+.yt-content-h {
+  font-family:'Playfair Display',serif; font-weight:900;
+  font-size:2.2rem; line-height:1.1; letter-spacing:-.03em; margin-bottom:20px;
+}
+.yt-content-h em { font-style:italic; color:var(--electric); }
+.yt-content-p { font-size:.92rem; color:var(--muted); line-height:1.85; margin-bottom:28px; }
+.yt-feats { list-style:none; display:flex; flex-direction:column; gap:10px; margin-bottom:36px; }
+.yt-feats li { display:flex; align-items:center; gap:10px; font-size:.9rem; color:var(--muted); }
+.yt-feats li::before { content:'✦'; color:var(--electric); font-size:.8rem; }
+
+.yt-cta {
+  display:inline-flex; align-items:center; gap:10px;
+  background:#ff0000; color:#fff; padding:14px 32px;
+  font-family:'Manrope',sans-serif; font-weight:700; font-size:.88rem;
+  text-decoration:none; border:2px solid #ff0000; transition:all .3s;
+}
+.yt-cta:hover { background:transparent; color:#ff0000; }
+
+/* ══════════════════════════════════════════
+   CONTACT
+══════════════════════════════════════════ */
+.contact-layout { display:grid; grid-template-columns:1fr 1.2fr; gap:80px; }
+.contact-left { display:flex; flex-direction:column; gap:16px; }
+
+.c-info-card {
+  display:flex; align-items:center; gap:18px;
+  padding:22px 26px; background:var(--deep); border:1px solid var(--border);
+  transition:border-color .3s;
+}
+.c-info-card:hover { border-color:var(--border2); }
+.c-info-icon {
+  width:44px; height:44px; background:var(--mid); border:1px solid var(--border2);
+  display:flex; align-items:center; justify-content:center; flex-shrink:0; color:var(--electric);
+}
+.c-info-lbl { font-family:'Space Mono',monospace; font-size:.6rem; letter-spacing:.15em; text-transform:uppercase; color:var(--muted); margin-bottom:4px; }
+.c-info-val { font-size:.95rem; color:var(--white); font-weight:500; }
+.c-info-val a { color:var(--white); text-decoration:none; transition:color .25s; }
+.c-info-val a:hover { color:var(--electric); }
+
+.soc-section-label {
+  font-family:'Space Mono',monospace; font-size:.62rem; letter-spacing:.2em;
+  text-transform:uppercase; color:var(--muted); margin:24px 0 14px;
+}
+.soc-list { display:grid; grid-template-columns:1fr 1fr; gap:2px; background:var(--border); }
+.soc-item {
+  background:var(--deep); display:flex; align-items:center; gap:14px;
+  padding:16px 20px; text-decoration:none; color:var(--white); transition:background .25s;
+}
+.soc-item:hover { background:var(--mid); }
+.soc-item:hover .soc-nm { color:var(--electric); }
+.soc-ico {
+  width:36px; height:36px; border:1px solid var(--border);
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.soc-pl { font-family:'Space Mono',monospace; font-size:.56rem; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+.soc-nm { font-family:'Manrope',sans-serif; font-weight:600; font-size:.82rem; transition:color .25s; }
+
+/* FORM */
+.cform { display:flex; flex-direction:column; gap:16px; }
+.crow { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.cgrp { display:flex; flex-direction:column; gap:7px; }
+.clbl { font-family:'Space Mono',monospace; font-size:.62rem; letter-spacing:.15em; text-transform:uppercase; color:var(--muted); }
+.cinp,.cta,.csel {
+  background:var(--deep); border:1px solid var(--border); color:var(--white);
+  padding:14px 18px; font-family:'Manrope',sans-serif; font-size:.9rem;
+  outline:none; resize:none; transition:border-color .25s, box-shadow .25s;
+}
+.cinp:focus,.cta:focus,.csel:focus {
+  border-color:var(--electric);
+  box-shadow:0 0 0 3px rgba(79,142,247,.09);
+}
+.cta { min-height:130px; }
+.csel option { background:var(--navy); }
+.csub {
+  font-family:'Manrope',sans-serif; font-weight:700; font-size:.9rem;
+  padding:16px 44px; background:var(--electric); color:var(--ink);
+  border:2px solid var(--electric); cursor:pointer; transition:all .3s;
+  align-self:flex-start;
+}
+.csub:hover { background:transparent; color:var(--electric); }
+#cok { display:none; color:var(--mint); font-family:'Space Mono',monospace; font-size:.75rem; letter-spacing:.1em; margin-top:6px; }
+
+/* ══════════════════════════════════════════
+   FOOTER
+══════════════════════════════════════════ */
+footer {
+  background:var(--ink); border-top:1px solid var(--border); padding:60px 64px 40px;
+}
+.ft-row {
+  display:flex; justify-content:space-between; align-items:flex-start;
+  margin-bottom:48px; padding-bottom:48px; border-bottom:1px solid var(--border);
+}
+.ft-brand {}
+.ft-tagline { font-size:.85rem; color:var(--muted); font-style:italic; margin-top:10px; max-width:280px; line-height:1.6; }
+.ft-cols { display:flex; gap:64px; }
+.ft-col h5 { font-family:'Space Mono',monospace; font-size:.6rem; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); margin-bottom:18px; }
+.ft-col ul { list-style:none; display:flex; flex-direction:column; gap:10px; }
+.ft-col a { font-size:.86rem; color:var(--muted); text-decoration:none; transition:color .25s; }
+.ft-col a:hover { color:var(--electric); }
+.ft-bottom { display:flex; justify-content:space-between; align-items:center; }
+.ft-copy { font-family:'Space Mono',monospace; font-size:.65rem; letter-spacing:.07em; color:var(--muted); }
+.ft-copy em { color:var(--electric); font-style:normal; }
+.ft-icons { display:flex; gap:10px; }
+.ft-ic {
+  width:32px; height:32px; border:1px solid var(--border);
+  display:flex; align-items:center; justify-content:center;
+  color:var(--muted); text-decoration:none; transition:all .25s;
+}
+.ft-ic:hover { border-color:var(--electric); color:var(--electric); box-shadow:0 0 12px var(--glow-e); }
+
+/* ══════════════════════════════════════════
+   REVEAL ANIMATION
+══════════════════════════════════════════ */
+.rev { opacity:0; transform:translateY(36px); transition:opacity .8s, transform .8s; }
+.rev.in { opacity:1; transform:none; }
+.rev-l { opacity:0; transform:translateX(-30px); transition:opacity .8s, transform .8s; }
+.rev-l.in { opacity:1; transform:none; }
+
+/* ══════════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════════ */
+@media(max-width:1100px) {
+  .hero { grid-template-columns:1fr; }
+  .hero-right { display:none; }
+  .yt-layout { grid-template-columns:1fr; gap:48px; }
+}
+@media(max-width:900px) {
+  nav { padding:0 24px; }
+  .nav-links,.nav-btn { display:none; }
+  .hero { padding:100px 24px 80px; }
+  .hero-scroll { left:24px; }
+  .section { padding:80px 24px; }
+  .svc-grid { grid-template-columns:1fr; }
+  .proj-grid { grid-template-columns:1fr; }
+  .proc-row { grid-template-columns:repeat(2,1fr); }
+  .proc-line { display:none; }
+  .proc-item { border-right:none; border-bottom:1px solid var(--border); }
+  .contact-layout { grid-template-columns:1fr; gap:48px; }
+  .soc-list { grid-template-columns:1fr; }
+  .ft-row { flex-direction:column; gap:40px; }
+  .ft-cols { flex-direction:column; gap:28px; }
+  footer { padding:48px 24px 30px; }
+  .crow { grid-template-columns:1fr; }
+}
+
+::-webkit-scrollbar { width:4px; }
+::-webkit-scrollbar-track { background:var(--ink); }
+::-webkit-scrollbar-thumb { background:linear-gradient(var(--electric),var(--gold)); }
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="ld-logo">Feature <em>Designz</em></div>
+  <div class="ld-bar-wrap"><div class="ld-bar"></div></div>
+  <div class="ld-txt">Creative Studio · Sri Lanka</div>
+</div>
+
+<!-- NAV -->
+<nav>
+  <a href="#home" class="nav-logo">
+    <div class="nav-logo-mark"></div>
+    <span class="nav-logo-text">Feature<em>Designz</em></span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="#services">Services</a></li>
+    <li><a href="#projects">Projects</a></li>
+    <li><a href="#process">Process</a></li>
+    <li><a href="#youtube">YouTube</a></li>
+    <li><a href="#contact">Contact</a></li>
+  </ul>
+  <a href="#contact" class="nav-btn">Start a Project</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero" id="home">
+  <div class="hero-bg"></div>
+  <div class="hero-grid-bg"></div>
+
+  <div class="hero-left">
+    <div class="hero-eyebrow">
+      <div class="eyebrow-pulse"></div>
+      Creative Studio · Sri Lanka 🇱🇰
+    </div>
+
+    <h1 class="hero-h1">
+      We Bring<br>
+      <span class="italic">Ideas to Life</span><br>
+      <span class="outline">Digitally.</span>
+    </h1>
+
+    <p class="hero-sub">
+      <strong>Full-stack web development</strong>, mobile apps, graphics design & video editing —
+      crafted to make your brand unforgettable.
+    </p>
+
+    <div class="hero-ctas">
+      <a href="#projects" class="cta-primary"><span>View Our Work</span></a>
+      <a href="#contact" class="cta-secondary">
+        Start a Project
+        <svg class="cta-arrow" width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </a>
+    </div>
+  </div>
+
+  <div class="hero-right">
+    <div class="hero-card-stack">
+      <!-- Main card -->
+      <div class="h-card h-card-main">
+        <div class="hc-badge"><span>●</span> Live Studio</div>
+        <div class="hc-title">Where Creativity<br>Meets Code.</div>
+        <div class="hc-metrics">
+          <div class="hc-m">
+            <div class="hc-m-n">50<em>+</em></div>
+            <div class="hc-m-l">Projects Done</div>
+          </div>
+          <div class="hc-m">
+            <div class="hc-m-n">30<em>+</em></div>
+            <div class="hc-m-l">Happy Clients</div>
+          </div>
+          <div class="hc-m">
+            <div class="hc-m-n">3<em>+</em></div>
+            <div class="hc-m-l">Years Active</div>
+          </div>
+        </div>
+      </div>
+      <!-- Small card 1 -->
+      <div class="h-card h-card-sm1">
+        <div class="h-sm-label">Latest Service</div>
+        <div class="h-sm-val">Full Stack<br>Web Dev</div>
+      </div>
+      <!-- Small card 2 -->
+      <div class="h-card h-card-sm2">
+        <div class="h-sm-label">Studio Status</div>
+        <div class="h-sm-val"><span class="h-sm-dot"></span><em>Available</em></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hero-scroll">
+    <div class="scroll-track"></div>
+    Scroll
+  </div>
+</section>
+
+<!-- MARQUEE -->
+<div class="mq">
+  <div class="mq-inner">
+    <div class="mq-i"><span class="mq-star e">✦</span> Web Development</div>
+    <div class="mq-i">Mobile Apps <span class="mq-star g">✦</span></div>
+    <div class="mq-i">Graphic Design <span class="mq-star m">✦</span></div>
+    <div class="mq-i">Video Editing <span class="mq-star e">✦</span></div>
+    <div class="mq-i">Brand Identity <span class="mq-star g">✦</span></div>
+    <div class="mq-i">UI / UX Design <span class="mq-star m">✦</span></div>
+    <div class="mq-i">React &amp; Next.js <span class="mq-star e">✦</span></div>
+    <div class="mq-i">Flutter &amp; React Native <span class="mq-star g">✦</span></div>
+    <!-- duplicate -->
+    <div class="mq-i"><span class="mq-star e">✦</span> Web Development</div>
+    <div class="mq-i">Mobile Apps <span class="mq-star g">✦</span></div>
+    <div class="mq-i">Graphic Design <span class="mq-star m">✦</span></div>
+    <div class="mq-i">Video Editing <span class="mq-star e">✦</span></div>
+    <div class="mq-i">Brand Identity <span class="mq-star g">✦</span></div>
+    <div class="mq-i">UI / UX Design <span class="mq-star m">✦</span></div>
+    <div class="mq-i">React &amp; Next.js <span class="mq-star e">✦</span></div>
+    <div class="mq-i">Flutter &amp; React Native <span class="mq-star g">✦</span></div>
+  </div>
+</div>
+
+<!-- SERVICES -->
+<section class="section" id="services">
+  <div class="section-head rev">
+    <div class="section-label">What We Do</div>
+    <h2 class="section-title">Our Core <em>Services</em></h2>
+  </div>
+
+  <div class="svc-grid">
+    <div class="svc rev">
+      <div class="svc-glow"></div>
+      <div class="svc-num">01</div>
+      <div class="svc-icon">
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <rect x="2" y="7" width="40" height="30" rx="2" stroke="#4f8ef7" stroke-width="1.8"/>
+          <path d="M2 14h40" stroke="#4f8ef7" stroke-width="1.8"/>
+          <circle cx="9" cy="10.5" r="1.5" fill="#4f8ef7"/>
+          <circle cx="15" cy="10.5" r="1.5" fill="rgba(79,142,247,.4)"/>
+          <path d="M14 22l-5 4 5 4M30 22l5 4-5 4M24 19l-4 14" stroke="#4f8ef7" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h3 class="svc-name">Full Stack Web Development</h3>
+      <p class="svc-desc">Modern, responsive, user-centric websites and web apps — built with clean architecture and scalable code from front to back.</p>
+      <div class="svc-tags">
+        <span class="stag">React</span><span class="stag">Next.js</span>
+        <span class="stag">Node.js</span><span class="stag">Laravel</span>
+        <span class="stag">MySQL</span><span class="stag">MongoDB</span>
+      </div>
+    </div>
+
+    <div class="svc rev">
+      <div class="svc-glow"></div>
+      <div class="svc-num">02</div>
+      <div class="svc-icon">
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <rect x="13" y="2" width="18" height="40" rx="3" stroke="#f0c060" stroke-width="1.8"/>
+          <path d="M18 7h8" stroke="#f0c060" stroke-width="1.8" stroke-linecap="round"/>
+          <circle cx="22" cy="37" r="1.8" fill="#f0c060"/>
+          <rect x="16" y="12" width="12" height="18" rx="1" stroke="rgba(240,192,96,.4)" stroke-width="1.5"/>
+        </svg>
+      </div>
+      <h3 class="svc-name">App Development</h3>
+      <p class="svc-desc">High-quality cross-platform mobile apps for iOS & Android — fast, intuitive, and feature-complete with native-like performance.</p>
+      <div class="svc-tags">
+        <span class="stag">Flutter</span><span class="stag">React Native</span>
+        <span class="stag">iOS</span><span class="stag">Android</span>
+        <span class="stag">Firebase</span>
+      </div>
+    </div>
+
+    <div class="svc rev">
+      <div class="svc-glow"></div>
+      <div class="svc-num">03</div>
+      <div class="svc-icon">
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <circle cx="22" cy="22" r="19" stroke="#60e0b8" stroke-width="1.8"/>
+          <circle cx="15" cy="16" r="4" fill="rgba(96,224,184,.2)" stroke="#60e0b8" stroke-width="1.5"/>
+          <circle cx="29" cy="16" r="4" fill="rgba(96,224,184,.12)" stroke="rgba(96,224,184,.5)" stroke-width="1.5"/>
+          <circle cx="22" cy="30" r="4" fill="rgba(96,224,184,.08)" stroke="rgba(96,224,184,.4)" stroke-width="1.5"/>
+        </svg>
+      </div>
+      <h3 class="svc-name">Branding &amp; Graphic Design</h3>
+      <p class="svc-desc">Developing unique visual identities that stand out — logos, brand systems, social media kits, and print materials that make your mark.</p>
+      <div class="svc-tags">
+        <span class="stag">Brand Identity</span><span class="stag">Logo Design</span>
+        <span class="stag">Social Media</span><span class="stag">Photoshop</span>
+        <span class="stag">Illustrator</span>
+      </div>
+    </div>
+
+    <div class="svc rev">
+      <div class="svc-glow"></div>
+      <div class="svc-num">04</div>
+      <div class="svc-icon">
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <rect x="2" y="10" width="28" height="24" rx="2" stroke="#f07060" stroke-width="1.8"/>
+          <path d="M30 16l12-6v24l-12-6" stroke="#f07060" stroke-width="1.8" stroke-linejoin="round"/>
+          <circle cx="16" cy="22" r="5" stroke="#f07060" stroke-width="1.5"/>
+          <path d="M14.5 20l4 2-4 2v-4z" fill="#f07060"/>
+        </svg>
+      </div>
+      <h3 class="svc-name">Video Editing &amp; Motion</h3>
+      <p class="svc-desc">YouTube videos, corporate reels, motion graphics, and cinematic edits — we transform raw footage into visual stories that captivate.</p>
+      <div class="svc-tags">
+        <span class="stag">Premiere Pro</span><span class="stag">After Effects</span>
+        <span class="stag">Motion Graphics</span><span class="stag">Color Grading</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PROJECTS -->
+<section class="section section-alt" id="projects">
+  <div class="section-head rev">
+    <div class="section-label">Our Portfolio</div>
+    <h2 class="section-title">Completed <em>Projects</em></h2>
+  </div>
+
+  <div class="proj-filters rev" id="fBar">
+    <button class="pf on" data-f="all">All Work</button>
+    <button class="pf" data-f="web">Web Dev</button>
+    <button class="pf" data-f="mobile">Mobile</button>
+    <button class="pf" data-f="design">Design</button>
+    <button class="pf" data-f="video">Video</button>
+  </div>
+
+  <div class="proj-grid" id="pGrid">
+
+    <div class="pcard rev" data-cat="web">
+      <div class="pcard-thumb tb1"><span>🛒</span>
+        <div class="pcard-ov"><a href="#" class="pcard-link">View Project</a></div>
+      </div>
+      <div class="pcard-body">
+        <div class="pcard-cat c-web">Web Development</div>
+        <div class="pcard-name">E-Commerce Platform</div>
+        <p class="pcard-desc">Full-featured online store with cart, payment gateway, admin dashboard, and real-time inventory.</p>
+        <div class="pcard-tags"><span class="ptag">React</span><span class="ptag">Node.js</span><span class="ptag">MongoDB</span><span class="ptag">Stripe</span></div>
+      </div>
+    </div>
+
+    <div class="pcard rev" data-cat="mobile">
+      <div class="pcard-thumb tb2"><span>🍔</span>
+        <div class="pcard-ov"><a href="#" class="pcard-link">View Project</a></div>
+      </div>
+      <div class="pcard-body">
+        <div class="pcard-cat c-mobile">Mobile App</div>
+        <div class="pcard-name">Food Delivery App</div>
+        <p class="pcard-desc">Cross-platform food ordering with real-time tracking, push notifications, and restaurant dashboard.</p>
+        <div class="pcard-tags"><span class="ptag">Flutter</span><span class="ptag">Firebase</span><span class="ptag">Google Maps</span></div>
+      </div>
+    </div>
+
+    <div class="pcard rev" data-cat="design">
+      <div class="pcard-thumb tb3"><span>🎨</span>
+        <div class="pcard-ov"><a href="#" class="pcard-link">View Project</a></div>
+      </div>
+      <div class="pcard-body">
+        <div class="pcard-cat c-design">Brand Identity</div>
+        <div class="pcard-name">Tech Startup Branding</div>
+        <p class="pcard-desc">Complete visual identity — logo, typography, color palette, business cards, and social media kit.</p>
+        <div class="pcard-tags"><span class="ptag">Illustrator</span><span class="ptag">Photoshop</span><span class="ptag">Figma</span></div>
+      </div>
+    </div>
+
+    <div class="pcard rev" data-cat="web">
+      <div class="pcard-thumb tb1"><span>🏥</span>
+        <div class="pcard-ov"><a href="#" class="pcard-link">View Project</a></div>
+      </div>
+      <div class="pcard-body">
+        <div class="pcard-cat c-web">Web Development</div>
+        <div class="pcard-name">Hospital Management System</div>
+        <p class="pcard-desc">Patient records, appointments, billing, and doctor portal — complete healthcare solution.</p>
+        <div class="pcard-tags"><span class="ptag">Laravel</span><span class="ptag">MySQL</span><span class="ptag">Vue.js</span></div>
+      </div>
+    </div>
+
+    <div class="pcard rev" data-cat="video">
+      <div class="pcard-thumb tb4"><span>🎬</span>
+        <div class="pcard-ov"><a href="#" class="pcard-link">View Project</a></div>
+      </div>
+      <div class="pcard-body">
+        <div class="pcard-cat c-video">Video Editing</div>
+        <div class="pcard-name">YouTube Channel Trailer</div>
+        <p class="pcard-desc">High-energy channel trailer with motion graphics, custom animations, and cinematic color grading.</p>
+        <div class="pcard-tags"><span class="ptag">Premiere Pro</span><span class="ptag">After Effects</span></div>
+      </div>
+    </div>
+
+    <div class="pcard rev" data-cat="mobile">
+      <div class="pcard-thumb tb2"><span>💪</span>
+        <div class="pcard-ov"><a href="#" class="pcard-link">View Project</a></div>
+      </div>
+      <div class="pcard-body">
+        <div class="pcard-cat c-mobile">Mobile App</div>
+        <div class="pcard-name">Fitness Tracker App</div>
+        <p class="pcard-desc">Workout planner, calorie tracker, progress charts, and social sharing for fitness enthusiasts.</p>
+        <div class="pcard-tags"><span class="ptag">React Native</span><span class="ptag">Firebase</span><span class="ptag">Redux</span></div>
+      </div>
+    </div>
+
+    <div class="pcard rev" data-cat="design">
+      <div class="pcard-thumb tb3"><span>☕</span>
+        <div class="pcard-ov"><a href="#" class="pcard-link">View Project</a></div>
+      </div>
+      <div class="pcard-body">
+        <div class="pcard-cat c-design">Graphics Design</div>
+        <div class="pcard-name">Coffee Shop Social Kit</div>
+        <p class="pcard-desc">30-piece social media kit with templates, stories, highlights, and promotional banners.</p>
+        <div class="pcard-tags"><span class="ptag">Photoshop</span><span class="ptag">Canva Pro</span></div>
+      </div>
+    </div>
+
+    <div class="pcard rev" data-cat="web">
+      <div class="pcard-thumb tb1"><span>📊</span>
+        <div class="pcard-ov"><a href="#" class="pcard-link">View Project</a></div>
+      </div>
+      <div class="pcard-body">
+        <div class="pcard-cat c-web">Web Development</div>
+        <div class="pcard-name">Analytics Dashboard</div>
+        <p class="pcard-desc">Real-time KPI dashboard with live charts, team management, and automated PDF report generation.</p>
+        <div class="pcard-tags"><span class="ptag">Next.js</span><span class="ptag">Chart.js</span><span class="ptag">PostgreSQL</span></div>
+      </div>
+    </div>
+
+    <div class="pcard rev" data-cat="video">
+      <div class="pcard-thumb tb4"><span>🎵</span>
+        <div class="pcard-ov"><a href="#" class="pcard-link">View Project</a></div>
+      </div>
+      <div class="pcard-body">
+        <div class="pcard-cat c-video">Video Editing</div>
+        <div class="pcard-name">Music Video Production</div>
+        <p class="pcard-desc">Full music video with VFX overlays, beat-synced cuts, professional color grading, and lyric animations.</p>
+        <div class="pcard-tags"><span class="ptag">Premiere Pro</span><span class="ptag">After Effects</span><span class="ptag">DaVinci</span></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- PROCESS -->
+<section class="section section-alt2" id="process">
+  <div class="section-head rev">
+    <div class="section-label">How We Work</div>
+    <h2 class="section-title">Our <em>Process</em></h2>
+  </div>
+  <div class="proc-row">
+    <div class="proc-line"></div>
+    <div class="proc-item rev">
+      <div class="proc-num">01</div>
+      <div class="proc-dot" style="background:var(--electric);box-shadow:0 0 14px var(--electric)"></div>
+      <div class="proc-name">Discovery</div>
+      <p class="proc-desc">Deep-dive into your goals, audience & requirements. We craft the right strategy before writing a single line of code.</p>
+    </div>
+    <div class="proc-item rev">
+      <div class="proc-num">02</div>
+      <div class="proc-dot" style="background:var(--gold);box-shadow:0 0 14px var(--gold)"></div>
+      <div class="proc-name">Design</div>
+      <p class="proc-desc">Wireframes, prototypes, pixel-perfect UI — every visual decision is intentional and true to your brand identity.</p>
+    </div>
+    <div class="proc-item rev">
+      <div class="proc-num">03</div>
+      <div class="proc-dot" style="background:var(--mint);box-shadow:0 0 14px var(--mint)"></div>
+      <div class="proc-name">Develop</div>
+      <p class="proc-desc">Clean, scalable code using modern tech stacks. Fast, secure, and maintainable systems that grow with your business.</p>
+    </div>
+    <div class="proc-item rev">
+      <div class="proc-num">04</div>
+      <div class="proc-dot" style="background:var(--coral);box-shadow:0 0 14px var(--coral)"></div>
+      <div class="proc-name">Launch</div>
+      <p class="proc-desc">Thorough QA, smooth deployment, and ongoing support — we make sure everything runs flawlessly post-launch.</p>
+    </div>
+  </div>
+</section>
+
+<!-- YOUTUBE -->
+<section class="section section-alt" id="youtube">
+  <div class="section-head rev">
+    <div class="section-label">Content Hub</div>
+    <h2 class="section-title">Watch Us on <em>YouTube</em></h2>
+  </div>
+  <div class="yt-layout">
+    <div class="rev">
+      <div class="yt-frame-outer">
+        <div class="yt-frame">
+          <iframe src="https://www.youtube.com/embed?listType=user_uploads&list=UCda2mc_f-nIinjWpDUJiA2g"
+            allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
+          </iframe>
+          <div class="yt-frame-accent"></div>
+        </div>
+        <div class="yt-pill">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="#ff0000">
+            <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
+          </svg>
+          <div>
+            <div class="yt-pill-ch">Feature Designz</div>
+            <div class="yt-pill-sub">Official YouTube Channel</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="rev">
+      <div class="section-label yt-content-label">Free Knowledge</div>
+      <h3 class="yt-content-h">Tutorials, Tips &amp;<br><em>Behind the Scenes</em></h3>
+      <p class="yt-content-p">We share web development tutorials, design tips, app build walkthroughs, and behind-the-scenes from real client projects. Learn from us — it's completely free.</p>
+      <ul class="yt-feats">
+        <li>Web &amp; Mobile Development Tutorials</li>
+        <li>UI/UX &amp; Graphic Design Tips</li>
+        <li>Real Project Behind-the-Scenes</li>
+        <li>Freelancing &amp; Career Advice</li>
+      </ul>
+      <a href="https://www.youtube.com/channel/UCda2mc_f-nIinjWpDUJiA2g" target="_blank" class="yt-cta">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg>
+        Subscribe Now
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section class="section" id="contact">
+  <div class="section-head rev">
+    <div class="section-label">Let's Talk</div>
+    <h2 class="section-title">Start Your <em>Project</em></h2>
+  </div>
+  <div class="contact-layout">
+    <div>
+      <div class="contact-left">
+        <div class="c-info-card rev">
+          <div class="c-info-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.63A2 2 0 012 0h3a2 2 0 012 1.72c.12 1.08.47 2.12.92 3.1a2 2 0 01-.45 2.11L6.91 8.49a16 16 0 006.59 6.59l1.56-1.56a2 2 0 012.11-.45c.98.45 2.02.8 3.1.92A2 2 0 0122 16.92z"/>
+            </svg>
+          </div>
+          <div>
+            <div class="c-info-lbl">Phone / WhatsApp</div>
+            <div class="c-info-val"><a href="tel:+94786675150">+94 786 675 150</a></div>
+          </div>
+        </div>
+        <div class="c-info-card rev">
+          <div class="c-info-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <polyline points="22,6 12,13 2,6"/>
+            </svg>
+          </div>
+          <div>
+            <div class="c-info-lbl">Email</div>
+            <div class="c-info-val"><a href="/cdn-cgi/l/email-protection#0e67606861686b6f7a7b7c6b6a6b7d676960744e69636f6762206d6163"><span class="__cf_email__" data-cfemail="90f9fef6fff6f5f1e4e5e2f5f4f5e3f9f7feead0f7fdf1f9fcbef3fffd">[email&#160;protected]</span></a></div>
+          </div>
+        </div>
+        <div class="c-info-card rev">
+          <div class="c-info-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
+              <circle cx="12" cy="10" r="3"/>
+            </svg>
+          </div>
+          <div>
+            <div class="c-info-lbl">Location</div>
+            <div class="c-info-val">Sri Lanka 🇱🇰</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="soc-section-label">Find Us Online</div>
+      <div class="soc-list">
+        <a href="https://www.youtube.com/channel/UCda2mc_f-nIinjWpDUJiA2g" target="_blank" class="soc-item">
+          <div class="soc-ico" style="color:#ff2020;border-color:rgba(255,32,32,.2)"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg></div>
+          <div><div class="soc-pl">YouTube</div><div class="soc-nm">Feature Designz</div></div>
+        </a>
+        <a href="https://www.facebook.com/featuredesignz" target="_blank" class="soc-item">
+          <div class="soc-ico" style="color:#1877f2;border-color:rgba(24,119,242,.2)"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></div>
+          <div><div class="soc-pl">Facebook</div><div class="soc-nm">Feature Designz</div></div>
+        </a>
+        <a href="https://www.instagram.com/featuredesignz" target="_blank" class="soc-item">
+          <div class="soc-ico" style="color:#e1306c;border-color:rgba(225,48,108,.2)"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></div>
+          <div><div class="soc-pl">Instagram</div><div class="soc-nm">@featuredesignz</div></div>
+        </a>
+        <a href="https://wa.me/94786675150" target="_blank" class="soc-item">
+          <div class="soc-ico" style="color:#25d366;border-color:rgba(37,211,102,.2)"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></div>
+          <div><div class="soc-pl">WhatsApp</div><div class="soc-nm">+94 786 675 150</div></div>
+        </a>
+        <a href="https://www.tiktok.com/@featuredesignz" target="_blank" class="soc-item">
+          <div class="soc-ico" style="color:#fff;border-color:rgba(255,255,255,.1);background:#010101"><svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.19 8.19 0 004.77 1.52V6.73a4.85 4.85 0 01-1-.04z"/></svg></div>
+          <div><div class="soc-pl">TikTok</div><div class="soc-nm">@featuredesignz</div></div>
+        </a>
+        <a href="https://x.com/featuredesignz" target="_blank" class="soc-item">
+          <div class="soc-ico" style="color:#fff;border-color:rgba(255,255,255,.15);background:#000"><svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.258 5.626 5.906-5.626zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></div>
+          <div><div class="soc-pl">X (Twitter)</div><div class="soc-nm">@featuredesignz</div></div>
+        </a>
+      </div>
+    </div>
+
+    <!-- FORM -->
+    <div class="rev">
+      <div style="margin-bottom:28px">
+        <div class="section-label" style="margin-bottom:12px">Send a Message</div>
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:1.5rem;letter-spacing:-.02em;">Tell Us About Your <em style="color:var(--electric)">Project</em></h3>
+      </div>
+      <form class="cform" onsubmit="doForm(event)">
+        <div class="crow">
+          <div class="cgrp"><label class="clbl">Your Name</label><input type="text" class="cinp" placeholder="Saman Perera" required></div>
+          <div class="cgrp"><label class="clbl">Email Address</label><input type="email" class="cinp" placeholder="saman@example.com" required></div>
+        </div>
+        <div class="cgrp">
+          <label class="clbl">Service Required</label>
+          <select class="csel">
+            <option value="">Select a service...</option>
+            <option>Full Stack Web Development</option>
+            <option>App Development</option>
+            <option>Branding &amp; Graphic Design</option>
+            <option>Video Editing &amp; Motion</option>
+            <option>Multiple Services</option>
+          </select>
+        </div>
+        <div class="cgrp">
+          <label class="clbl">Budget Range (USD)</label>
+          <select class="csel">
+            <option value="">Select budget...</option>
+            <option>$100 – $300</option><option>$300 – $500</option>
+            <option>$500 – $1,000</option><option>$1,000 – $3,000</option><option>$3,000+</option>
+          </select>
+        </div>
+        <div class="cgrp"><label class="clbl">Project Details</label><textarea class="cta" placeholder="Tell us about your project, goals, timeline, and requirements..."></textarea></div>
+        <button type="submit" class="csub">Send Message →</button>
+        <div id="cok">✓ Message sent! We'll reply within 24 hours.</div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="ft-row">
+    <div class="ft-brand">
+      <a href="#home" class="nav-logo">
+        <div class="nav-logo-mark"></div>
+        <span class="nav-logo-text">Feature<em>Designz</em></span>
+      </a>
+      <div class="ft-tagline">Modern solutions for creative minds.<br>We build interfaces that feel like home.</div>
+    </div>
+    <div class="ft-cols">
+      <div class="ft-col">
+        <h5>Services</h5>
+        <ul>
+          <li><a href="#services">Web Development</a></li>
+          <li><a href="#services">App Development</a></li>
+          <li><a href="#services">Graphic Design</a></li>
+          <li><a href="#services">Video Editing</a></li>
+        </ul>
+      </div>
+      <div class="ft-col">
+        <h5>Company</h5>
+        <ul>
+          <li><a href="#projects">Portfolio</a></li>
+          <li><a href="#process">Process</a></li>
+          <li><a href="#youtube">YouTube</a></li>
+          <li><a href="#contact">Contact</a></li>
+        </ul>
+      </div>
+      <div class="ft-col">
+        <h5>Contact</h5>
+        <ul>
+          <li><a href="tel:+94786675150">+94 786 675 150</a></li>
+          <li><a href="/cdn-cgi/l/email-protection#432a2d252c252622373631262726302a242d3903242e222a2f6d202c2e"><span class="__cf_email__" data-cfemail="f39a9d959c959692878681969796809a949d89b3949e929a9fdd909c9e">[email&#160;protected]</span></a></li>
+          <li><a href="https://www.youtube.com/channel/UCda2mc_f-nIinjWpDUJiA2g" target="_blank">YouTube Channel</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="ft-bottom">
+    <div class="ft-copy">© 2025 <em>Feature Designz</em>. Built with passion in Sri Lanka 🇱🇰</div>
+    <div class="ft-icons">
+      <a href="https://www.youtube.com/channel/UCda2mc_f-nIinjWpDUJiA2g" target="_blank" class="ft-ic" title="YouTube"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg></a>
+      <a href="https://www.instagram.com/featuredesignz" target="_blank" class="ft-ic" title="Instagram"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>
+      <a href="https://www.facebook.com/featuredesignz" target="_blank" class="ft-ic" title="Facebook"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>
+      <a href="https://wa.me/94786675150" target="_blank" class="ft-ic" title="WhatsApp"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></a>
+      <a href="https://x.com/featuredesignz" target="_blank" class="ft-ic" title="X/Twitter"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.258 5.626 5.906-5.626zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>
+    </div>
+  </div>
+</footer>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+// LOADER
+window.addEventListener('load', () => {
+  setTimeout(() => document.getElementById('loader').classList.add('out'), 1900);
+});
+
+// SCROLL REVEAL
+const reveals = document.querySelectorAll('.rev, .rev-l');
+const ro = new IntersectionObserver((entries) => {
+  entries.forEach((e, i) => {
+    if (e.isIntersecting) setTimeout(() => e.target.classList.add('in'), i * 65);
+  });
+}, { threshold: 0.08 });
+reveals.forEach(el => ro.observe(el));
+
+// ACTIVE NAV
+window.addEventListener('scroll', () => {
+  const y = window.scrollY;
+  document.querySelectorAll('.nav-links a').forEach(a => {
+    const id = a.getAttribute('href').substring(1);
+    const s = document.getElementById(id);
+    if (!s) return;
+    const t = s.offsetTop - 90, b = t + s.offsetHeight;
+    a.style.color = (y >= t && y < b) ? 'var(--electric)' : '';
+  });
+  // nav background solid on scroll
+  document.querySelector('nav').style.background =
+    window.scrollY > 60 ? 'rgba(4,8,15,0.97)' : 'rgba(4,8,15,0.85)';
+});
+
+// PROJECT FILTER
+document.getElementById('fBar').addEventListener('click', (e) => {
+  if (!e.target.classList.contains('pf')) return;
+  document.querySelectorAll('.pf').forEach(b => b.classList.remove('on'));
+  e.target.classList.add('on');
+  const f = e.target.dataset.f;
+  document.querySelectorAll('.pcard').forEach(c => {
+    const show = f === 'all' || c.dataset.cat === f;
+    if (show) {
+      c.style.display = 'block';
+      c.style.opacity = '0'; c.style.transform = 'translateY(16px)';
+      requestAnimationFrame(() => setTimeout(() => {
+        c.style.transition = 'opacity .4s, transform .4s, border-color .3s';
+        c.style.opacity = '1'; c.style.transform = 'none';
+      }, 20));
+    } else {
+      c.style.transition = 'opacity .2s';
+      c.style.opacity = '0';
+      setTimeout(() => { c.style.display = 'none'; }, 230);
+    }
+  });
+});
+
+// FORM — saves messages to localStorage for admin
+function doForm(e) {
+  e.preventDefault();
+  const btn = e.target.querySelector('.csub');
+  btn.textContent = 'Sending...'; btn.disabled = true;
+
+  const allInputs = e.target.querySelectorAll('.cinp, .csel, .cta');
+  const name    = allInputs[0]?.value?.trim() || '';
+  const email   = allInputs[1]?.value?.trim() || '';
+  const service = allInputs[2]?.value || '';
+  const budget  = allInputs[3]?.value || '';
+  const detail  = allInputs[4]?.value?.trim() || '';
+
+  const msgs = JSON.parse(localStorage.getItem('fd_messages') || '[]');
+  msgs.unshift({
+    id: 'msg_' + Date.now(),
+    name, email, service, budget, detail,
+    date: new Date().toISOString(),
+    read: false, replied: false, reply: ''
+  });
+  localStorage.setItem('fd_messages', JSON.stringify(msgs));
+
+  setTimeout(() => {
+    btn.textContent = '✓ Message Sent!';
+    document.getElementById('cok').style.display = 'block';
+    e.target.reset();
+    setTimeout(() => {
+      btn.textContent = 'Send Message →'; btn.disabled = false;
+      document.getElementById('cok').style.display = 'none';
+    }, 4000);
+  }, 1200);
+}
+
+// Load dynamic projects from admin if any
+(function loadDynamicProjects() {
+  const stored = JSON.parse(localStorage.getItem('fd_projects') || '[]');
+  if (!stored.length) return;
+  // projects are managed via admin panel
+})();
+</script>
+</body>
+</html>
