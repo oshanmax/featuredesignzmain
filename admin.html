@@ -5,121 +5,960 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Feature Designz — Admin Panel</title>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+
+<!-- ════════════════════════════════════════
+  ⚠️  FIREBASE CONFIG — REPLACE THESE VALUES
+      1. Go to console.firebase.google.com
+      2. Your Project → Project Settings → General → Your apps → Add web app
+      3. Copy the firebaseConfig object and paste below
+════════════════════════════════════════ -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
+         onAuthStateChanged, GoogleAuthProvider, signInWithPopup }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, doc, getDoc, getDocs, addDoc, updateDoc,
+         deleteDoc, onSnapshot, serverTimestamp, query, orderBy, setDoc }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// Expose modules globally for service status functions in regular <script>
+window.__fbModules = { doc, setDoc, serverTimestamp, onSnapshot, collection, addDoc, updateDoc, deleteDoc };
+
+/* ══════════════════════════════════════
+   🔥 PASTE YOUR FIREBASE CONFIG HERE
+══════════════════════════════════════ */
+const firebaseConfig = {
+  apiKey:            "AIzaSyCuEypEeXI7TVvos_1tMZ1o50EtJtefb7M",
+  authDomain:        "featuredesignzmain.firebaseapp.com",
+  projectId:         "featuredesignzmain",
+  storageBucket:     "featuredesignzmain.firebasestorage.app",
+  messagingSenderId: "307853117381",
+  appId:             "1:307853117381:web:fe3cab5e9ef0667d98edac",
+  measurementId:     "G-9D2PBLXHBB"
+};
+
+/* ══════════════════════════════════════
+   CONFIG
+══════════════════════════════════════ */
+const MAIN_ADMIN_EMAIL = "oshansudharaka1@gmail.com";
+const SESSION_DAYS = 3; // auto-logout after 3 days
+
+/* ══════════════════════════════════════
+   INIT FIREBASE
+══════════════════════════════════════ */
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+const gProvider = new GoogleAuthProvider();
+
+/* ══════════════════════════════════════
+   GLOBALS
+══════════════════════════════════════ */
+let currentUser = null;
+let currentRole = null; // 'main_admin' | 'admin'
+let unsubMessages = null;
+let unsubProjects = null;
+
+/* ══════════════════════════════════════
+   SESSION MANAGEMENT (3-day expiry)
+══════════════════════════════════════ */
+function setSession(uid) {
+  localStorage.setItem('fd_session', JSON.stringify({ uid, ts: Date.now() }));
+}
+function checkSession() {
+  const s = JSON.parse(localStorage.getItem('fd_session') || 'null');
+  if (!s) return false;
+  const days = (Date.now() - s.ts) / (1000 * 60 * 60 * 24);
+  if (days >= SESSION_DAYS) {
+    localStorage.removeItem('fd_session');
+    return false;
+  }
+  return true;
+}
+function clearSession() {
+  localStorage.removeItem('fd_session');
+}
+
+/* ══════════════════════════════════════
+   AUTH STATE
+══════════════════════════════════════ */
+onAuthStateChanged(auth, async user => {
+  if (user && checkSession()) {
+    currentUser = user;
+    const role = await getUserRole(user.uid, user.email);
+    currentRole = role;
+
+    if (!role) {
+      // Not approved yet
+      showScreen('pendingScreen');
+      document.getElementById('pending-email').textContent = user.email;
+      return;
+    }
+    if (role === 'rejected') {
+      showScreen('rejectedScreen');
+      return;
+    }
+    // Approved — show app
+    showScreen('appScreen');
+    initApp(user, role);
+  } else {
+    if (user && !checkSession()) {
+      await signOut(auth);
+    }
+    showScreen('loginScreen');
+  }
+});
+
+async function getUserRole(uid, email) {
+  if (email === MAIN_ADMIN_EMAIL) return 'main_admin';
+  try {
+    const snap = await getDoc(doc(db, 'admins', uid));
+    if (!snap.exists()) return null;
+    const d = snap.data();
+    if (d.status === 'approved') return 'admin';
+    if (d.status === 'rejected') return 'rejected';
+    return null; // pending
+  } catch { return null; }
+}
+
+/* ══════════════════════════════════════
+   LOGIN FUNCTIONS
+══════════════════════════════════════ */
+window.loginEmail = async function() {
+  const email = document.getElementById('l-email').value.trim();
+  const pass  = document.getElementById('l-pass').value;
+  const errEl = document.getElementById('l-err');
+  errEl.style.display = 'none';
+
+  if (!email || !pass) { showErr(errEl, 'Please fill all fields.'); return; }
+
+  try {
+    setBtn('l-btn', 'Signing in...', true);
+    const cred = await signInWithEmailAndPassword(auth, email, pass);
+    setSession(cred.user.uid);
+
+    // If new non-main-admin, create pending record
+    if (cred.user.email !== MAIN_ADMIN_EMAIL) {
+      const snap = await getDoc(doc(db, 'admins', cred.user.uid));
+      if (!snap.exists()) {
+        await setDoc(doc(db, 'admins', cred.user.uid), {
+          email: cred.user.email,
+          displayName: cred.user.displayName || cred.user.email.split('@')[0],
+          status: 'pending',
+          requestedAt: serverTimestamp(),
+          uid: cred.user.uid
+        });
+      }
+    }
+  } catch (e) {
+    showErr(errEl, friendlyErr(e.code));
+  } finally {
+    setBtn('l-btn', 'Sign In →', false);
+  }
+};
+
+window.loginGoogle = async function() {
+  const errEl = document.getElementById('l-err');
+  try {
+    setBtn('l-btn-g', 'Opening...', true);
+    const result = await signInWithPopup(auth, gProvider);
+    const user = result.user;
+    setSession(user.uid);
+
+    if (user.email !== MAIN_ADMIN_EMAIL) {
+      const snap = await getDoc(doc(db, 'admins', user.uid));
+      if (!snap.exists()) {
+        await setDoc(doc(db, 'admins', user.uid), {
+          email: user.email,
+          displayName: user.displayName || user.email.split('@')[0],
+          photoURL: user.photoURL || '',
+          status: 'pending',
+          requestedAt: serverTimestamp(),
+          uid: user.uid
+        });
+      }
+    }
+  } catch (e) {
+    if (e.code !== 'auth/popup-closed-by-user') showErr(errEl, friendlyErr(e.code));
+  } finally {
+    setBtn('l-btn-g', 'Continue with Google', false);
+  }
+};
+
+window.forgotPassword = async function() {
+  const email = document.getElementById('l-email').value.trim();
+  const errEl = document.getElementById('l-err');
+  if (!email) { showErr(errEl, 'Enter your email address first.'); return; }
+  try {
+    await sendPasswordResetEmail(auth, email);
+    showErr(errEl, '✅ Reset email sent to ' + email + '. Check your Gmail!', 'success');
+  } catch (e) {
+    showErr(errEl, friendlyErr(e.code));
+  }
+};
+
+window.doLogout = async function() {
+  if (unsubMessages) unsubMessages();
+  if (unsubProjects) unsubProjects();
+  clearSession();
+  await signOut(auth);
+};
+
+function friendlyErr(code) {
+  const m = {
+    'auth/wrong-password': 'Incorrect password.',
+    'auth/user-not-found': 'No account found with this email.',
+    'auth/invalid-email': 'Invalid email address.',
+    'auth/too-many-requests': 'Too many attempts. Try again later.',
+    'auth/invalid-credential': 'Invalid email or password.',
+    'auth/network-request-failed': 'Network error. Check your connection.',
+  };
+  return m[code] || 'Error: ' + code;
+}
+
+/* ══════════════════════════════════════
+   APP INIT
+══════════════════════════════════════ */
+function initApp(user, role) {
+  // Update UI for role
+  document.getElementById('app-user-name').textContent = user.displayName || user.email.split('@')[0];
+  document.getElementById('app-user-email').textContent = user.email;
+  document.getElementById('app-role-badge').textContent = role === 'main_admin' ? '★ Main Admin' : 'Admin';
+  document.getElementById('app-role-badge').className = 'role-badge ' + (role === 'main_admin' ? 'role-main' : 'role-admin');
+
+  // Show/hide admin management tab (only main admin)
+  document.getElementById('tab-admins').style.display = role === 'main_admin' ? 'flex' : 'none';
+
+  // Start clock
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  // Load data with real-time listeners
+  subscribeMessages();
+  subscribeProjects();
+  subscribeServices();
+  loadYoutubeSettings();
+  if (role === 'main_admin') subscribeAdmins();
+
+  // Show dashboard
+  gotoPage('dashboard');
+  renderDash();
+
+  // Session countdown
+  startSessionCountdown();
+}
+
+function startSessionCountdown() {
+  setInterval(() => {
+    if (!checkSession()) {
+      toast('Session expired. Please log in again.', 'error');
+      setTimeout(() => doLogout(), 2500);
+    }
+  }, 60000); // check every minute
+}
+
+function updateClock() {
+  const n = new Date();
+  const el = document.getElementById('tb-time');
+  if (el) el.textContent = n.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+/* ══════════════════════════════════════
+   SCREEN HELPERS
+══════════════════════════════════════ */
+function showScreen(id) {
+  ['loginScreen','appScreen','pendingScreen','rejectedScreen'].forEach(s => {
+    const el = document.getElementById(s);
+    if (el) el.style.display = s === id ? 'flex' : 'none';
+  });
+  if (id === 'appScreen') document.getElementById('appScreen').style.display = 'flex';
+}
+
+function setBtn(id, txt, disabled) {
+  const el = document.getElementById(id);
+  if (el) { el.textContent = txt; el.disabled = disabled; }
+}
+
+function showErr(el, msg, type = 'error') {
+  el.textContent = msg;
+  el.style.display = 'block';
+  el.style.color = type === 'success' ? 'var(--mint)' : 'var(--red)';
+}
+
+/* ══════════════════════════════════════
+   MESSAGES — REALTIME
+══════════════════════════════════════ */
+let messagesCache = [];
+
+function subscribeMessages() {
+  const q = query(collection(db, 'messages'), orderBy('date', 'desc'));
+  unsubMessages = onSnapshot(q, snap => {
+    messagesCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderMessages();
+    renderDash();
+    updateBadge();
+  }, err => console.error('Messages error:', err));
+}
+
+// Save message from contact form (called by index.html via postMessage or direct)
+window.saveMessage = async function(data) {
+  try {
+    await addDoc(collection(db, 'messages'), {
+      ...data,
+      date: serverTimestamp(),
+      read: false,
+      replied: false,
+      reply: '',
+      replyDate: null
+    });
+  } catch (e) { console.error('saveMessage error:', e); }
+};
+
+window.renderMessages = function(q = '') {
+  let msgs = [...messagesCache];
+  const sq = (q || document.querySelector('#page-messages .fsearch')?.value || '').toLowerCase();
+  const flt = document.getElementById('mFilter')?.value || '';
+  if (sq) msgs = msgs.filter(m => m.name?.toLowerCase().includes(sq) || m.email?.toLowerCase().includes(sq) || m.detail?.toLowerCase().includes(sq));
+  if (flt === 'unread')  msgs = msgs.filter(m => !m.read);
+  if (flt === 'replied') msgs = msgs.filter(m => m.replied);
+  if (flt === 'pending') msgs = msgs.filter(m => !m.replied);
+
+  const list = document.getElementById('msg-list');
+  const em   = document.getElementById('msg-empty');
+  if (!list) return;
+
+  if (!msgs.length) {
+    list.innerHTML = ''; em.style.display = 'block'; return;
+  }
+  em.style.display = 'none';
+
+  list.innerHTML = msgs.map(m => `
+    <div class="mcard ${!m.read ? 'unread' : ''} ${m.replied ? 'replied' : ''}">
+      <div class="mc-top">
+        <div>
+          <div class="mc-sender">${esc(m.name)}</div>
+          <div class="mc-email">${esc(m.email)}</div>
+        </div>
+        <div class="mc-meta">
+          <div class="mc-date">${fmtTS(m.date)}</div>
+          <div class="mc-badges">
+            ${!m.read ? '<span class="badge b-blue">● Unread</span>' : '<span class="badge b-grey">Read</span>'}
+            ${m.replied ? '<span class="badge b-mint">✓ Replied</span>' : '<span class="badge b-red">Not Replied</span>'}
+          </div>
+        </div>
+      </div>
+      <div class="mc-srv-bgt">
+        ${m.service ? `<span class="badge b-blue">📋 ${esc(m.service)}</span>` : ''}
+        ${m.budget  ? `<span class="badge b-gold">💰 ${esc(m.budget)}</span>`  : ''}
+      </div>
+      <div class="mc-body">${esc(m.detail || '(No message)')}</div>
+      ${m.replied && m.reply ? `
+        <div class="reply-box">
+          <div class="reply-lbl">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="#ea4335"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 010 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg>
+            Replied via Gmail ${m.replyDate ? '· ' + fmtTS(m.replyDate) : ''}
+          </div>
+          <div class="reply-text">${esc(m.reply)}</div>
+        </div>` : ''}
+      <div class="mc-actions">
+        ${!m.read ? `<button class="btn btn-ghost btn-sm" onclick="markRead('${m.id}')">✓ Mark Read</button>` : ''}
+        <button class="btn btn-gmail btn-sm" onclick="openGmail('${m.id}')">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 010 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg>
+          ${m.replied ? 'Re-reply via Gmail' : 'Reply via Gmail'}
+        </button>
+        <button class="btn btn-danger btn-sm" onclick="cfm('Delete Message','Delete this message permanently?',()=>delMsg('${m.id}'))">🗑️</button>
+      </div>
+    </div>`).join('');
+};
+
+window.markRead = async function(id) {
+  await updateDoc(doc(db, 'messages', id), { read: true });
+  toast('Marked as read', 'success');
+};
+window.markAllRead = async function() {
+  const unread = messagesCache.filter(m => !m.read);
+  await Promise.all(unread.map(m => updateDoc(doc(db, 'messages', m.id), { read: true })));
+  toast('All marked as read', 'success');
+};
+window.delMsg = async function(id) {
+  await deleteDoc(doc(db, 'messages', id));
+  toast('Message deleted', 'success');
+};
+
+function updateBadge() {
+  const n = messagesCache.filter(m => !m.read).length;
+  const b = document.getElementById('msgBadge');
+  if (b) { b.textContent = n; b.style.display = n > 0 ? 'flex' : 'none'; }
+}
+
+/* ══════════════════════════════════════
+   GMAIL REPLY
+══════════════════════════════════════ */
+let gmailMsgId = null;
+
+window.openGmail = function(id) {
+  const m = messagesCache.find(x => x.id === id);
+  if (!m) return;
+  gmailMsgId = id;
+  const g = JSON.parse(localStorage.getItem('fd_gmail') || '{"email":"infofeaturedesignz@gmail.com","subj":"Re: Your Feature Designz Inquiry"}');
+  document.getElementById('gm-to').textContent   = m.email;
+  document.getElementById('gm-subj').textContent = g.subj + ' — ' + m.name;
+  document.getElementById('gm-from').textContent = m.name + ' <' + m.email + '>';
+  document.getElementById('gm-orig').textContent = m.detail || '(No message)';
+  document.getElementById('gm-reply').value = m.reply ||
+    `Hi ${m.name},\n\nThank you for reaching out to Feature Designz!\n\n\n\nBest regards,\nFeature Designz Team\n📞 +94 786 675 150\n📧 infofeaturedesignz@gmail.com`;
+  if (!m.read) updateDoc(doc(db, 'messages', id), { read: true });
+  openM('gmailModal');
+};
+
+window.sendViaGmail = async function() {
+  const replyText = document.getElementById('gm-reply').value.trim();
+  if (!replyText) { toast('Write a reply first', 'error'); return; }
+  const m = messagesCache.find(x => x.id === gmailMsgId);
+  if (!m) return;
+  const g = JSON.parse(localStorage.getItem('fd_gmail') || '{"email":"infofeaturedesignz@gmail.com","subj":"Re: Your Feature Designz Inquiry"}');
+  const subjLine = g.subj + ' — ' + m.name;
+  const body = replyText + '\n\n---\nOriginal:\nFrom: ' + m.name + ' (' + m.email + ')\nService: ' + (m.service || 'N/A') + '\nMessage: ' + m.detail;
+  window.open('mailto:' + encodeURIComponent(m.email) + '?subject=' + encodeURIComponent(subjLine) + '&body=' + encodeURIComponent(body), '_blank');
+  await updateDoc(doc(db, 'messages', gmailMsgId), {
+    reply: replyText, replied: true, read: true, replyDate: serverTimestamp()
+  });
+  closeM('gmailModal');
+  toast('Gmail opened! Reply saved ✓', 'success');
+};
+
+/* ══════════════════════════════════════
+   PROJECTS — REALTIME
+══════════════════════════════════════ */
+let projectsCache = [];
+let pCatF = '';
+let pEditId = null;
+
+function subscribeProjects() {
+  const q = query(collection(db, 'projects'), orderBy('createdAt', 'desc'));
+  unsubProjects = onSnapshot(q, snap => {
+    projectsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderProjects();
+    renderDash();
+    renderProjectsSection();
+  });
+}
+
+window.renderProjects = function(q = '', catF = '') {
+  if (catF !== '') pCatF = catF;
+  let p = [...projectsCache];
+  const sq = (q || document.querySelector('#page-projects .fsearch')?.value || '').toLowerCase();
+  if (sq) p = p.filter(x => x.name?.toLowerCase().includes(sq) || x.desc?.toLowerCase().includes(sq));
+  if (pCatF) p = p.filter(x => x.cat === pCatF);
+
+  const tb = document.getElementById('proj-tbody');
+  const em = document.getElementById('proj-empty');
+  if (!tb) return;
+
+  if (!p.length) { tb.innerHTML = ''; em.style.display = 'block'; return; }
+  em.style.display = 'none';
+
+  tb.innerHTML = p.map(x => `<tr>
+    <td>
+      <div style="display:flex;align-items:center;gap:9px">
+        <span style="font-size:1.2rem">${x.emoji || '📁'}</span>
+        <div>
+          <div style="font-weight:600">${esc(x.name)}</div>
+          <div style="font-size:.73rem;color:var(--txt3);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.desc)}</div>
+        </div>
+      </div>
+    </td>
+    <td><span class="badge ${catB[x.cat] || 'b-grey'}">${catL[x.cat] || x.cat}</span></td>
+    <td>
+      <div class="progress-wrap">
+        <div class="progress-bar" style="width:${x.progress || 0}%"></div>
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--txt3);margin-top:3px">${x.progress || 0}% complete</div>
+    </td>
+    <td>${statusBadge(x.status, x.progress)}</td>
+    <td style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--txt3)">${fmtTS(x.createdAt)}</td>
+    <td style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--txt3)">${fmtTS(x.updatedAt) || '—'}</td>
+    <td>
+      <div style="display:flex;gap:5px">
+        ${x.url ? `<a href="${esc(x.url)}" target="_blank" class="btn btn-ghost btn-sm">🔗</a>` : ''}
+        <button class="btn btn-ghost btn-sm" onclick="editProj('${x.id}')">✏️ Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="cfm('Delete Project','Delete permanently?',()=>delProj('${x.id}'))">🗑️</button>
+      </div>
+    </td>
+  </tr>`).join('');
+};
+
+// Project section for viewing completed vs in-progress
+function renderProjectsSection() {
+  const completed   = projectsCache.filter(p => p.status === 'completed' || (p.progress || 0) >= 100);
+  const inProgress  = projectsCache.filter(p => p.status === 'inprogress' || ((p.progress || 0) < 100 && !['completed','update_soon','paused','off'].includes(p.status)));
+  const updateSoon  = projectsCache.filter(p => p.status === 'update_soon');
+  const offProjs    = projectsCache.filter(p => p.status === 'off');
+
+  const cEl  = document.getElementById('ps-completed');
+  const iEl  = document.getElementById('ps-inprogress');
+  const usEl = document.getElementById('ps-updatesoon');
+  const offEl= document.getElementById('ps-off');
+  if (!cEl) return;
+
+  cEl.innerHTML  = !completed.length  ? '<div class="empty"><div class="empty-ico">✅</div><div class="empty-txt">No completed projects yet</div></div>'  : completed.map(p  => projCard(p,'completed')).join('');
+  iEl.innerHTML  = !inProgress.length ? '<div class="empty"><div class="empty-ico">⏳</div><div class="empty-txt">No in-progress projects</div></div>'      : inProgress.map(p => projCard(p,'inprogress')).join('');
+  if(usEl) usEl.innerHTML = !updateSoon.length ? '<div class="empty"><div class="empty-ico">🔄</div><div class="empty-txt">No projects marked Update Soon</div></div>' : updateSoon.map(p => projCard(p,'update_soon')).join('');
+  if(offEl) offEl.innerHTML= !offProjs.length  ? '<div class="empty"><div class="empty-ico">🚫</div><div class="empty-txt">No hidden projects</div></div>'              : offProjs.map(p  => projCard(p,'off')).join('');
+
+  document.getElementById('ps-count-c').textContent  = completed.length;
+  document.getElementById('ps-count-i').textContent  = inProgress.length;
+  const usCount = document.getElementById('ps-count-us');
+  const offCount= document.getElementById('ps-count-off');
+  if(usCount)  usCount.textContent  = updateSoon.length;
+  if(offCount) offCount.textContent = offProjs.length;
+}
+
+function projCard(p, type) {
+  const pct = p.progress || 0;
+  const colorMap = { completed:'var(--mint)', inprogress:'var(--blue)', update_soon:'var(--cyan)', paused:'var(--txt3)', off:'var(--red)' };
+  const color = colorMap[type] || colorMap[p.status] || 'var(--blue)';
+  return `
+    <div class="proj-card-view">
+      <div class="pcv-top">
+        <span style="font-size:1.6rem">${p.emoji || '📁'}</span>
+        <div style="flex:1">
+          <div class="pcv-name">${esc(p.name)}</div>
+          <span class="badge ${catB[p.cat] || 'b-grey'}" style="margin-top:4px">${catL[p.cat] || p.cat}</span>
+        </div>
+        ${statusBadge(p.status, pct)}
+      </div>
+      <div class="pcv-desc">${esc(p.desc)}</div>
+      <div class="pcv-progress-row">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--txt3)">Completion</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:.7rem;font-weight:500;color:${color}">${pct}%</span>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-bar" style="width:${pct}%;background:${color}"></div>
+      </div>
+      <div class="pcv-chips">
+        ${(p.tags || []).map(t => `<span class="chip">${esc(t)}</span>`).join('')}
+      </div>
+      <div class="pcv-footer">
+        <span>Added: ${fmtTS(p.createdAt)}</span>
+        ${p.updatedAt ? `<span>Updated: ${fmtTS(p.updatedAt)}</span>` : ''}
+      </div>
+      <div style="display:flex;gap:6px;margin-top:10px">
+        ${p.url ? `<a href="${esc(p.url)}" target="_blank" class="btn btn-ghost btn-sm">🔗 View Live</a>` : ''}
+        <button class="btn btn-ghost btn-sm" onclick="editProj('${p.id}')">✏️ Edit</button>
+      </div>
+    </div>`;
+}
+
+window.openProjModal = function(id = null) {
+  pEditId = id;
+  document.getElementById('pm-title').textContent = id ? 'Edit Project' : 'Add New Project';
+  ['pe-name','pe-desc','pe-tags','pe-url','pe-emoji','pe-client','pe-notes'].forEach(i => {
+    const el = document.getElementById(i); if (el) el.value = '';
+  });
+  document.getElementById('pe-cat').value = '';
+  document.getElementById('pe-status').value = 'inprogress';
+  document.getElementById('pe-progress').value = '0';
+  document.getElementById('pe-prog-val').textContent = '0%';
+  document.getElementById('pe-id').value = '';
+
+  if (id) {
+    const x = projectsCache.find(p => p.id === id);
+    if (x) {
+      document.getElementById('pe-name').value    = x.name || '';
+      document.getElementById('pe-cat').value     = x.cat || '';
+      document.getElementById('pe-desc').value    = x.desc || '';
+      document.getElementById('pe-tags').value    = (x.tags || []).join(', ');
+      document.getElementById('pe-url').value     = x.url || '';
+      document.getElementById('pe-emoji').value   = x.emoji || '';
+      document.getElementById('pe-status').value  = x.status || 'inprogress';
+      document.getElementById('pe-progress').value = x.progress || 0;
+      document.getElementById('pe-prog-val').textContent = (x.progress || 0) + '%';
+      document.getElementById('pe-client').value  = x.client || '';
+      document.getElementById('pe-notes').value   = x.notes || '';
+    }
+  }
+  openM('projModal');
+};
+window.editProj = id => window.openProjModal(id);
+
+window.saveProject = async function() {
+  const name     = document.getElementById('pe-name').value.trim();
+  const cat      = document.getElementById('pe-cat').value;
+  const desc     = document.getElementById('pe-desc').value.trim();
+  const tags     = document.getElementById('pe-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+  const url      = document.getElementById('pe-url').value.trim();
+  const emoji    = document.getElementById('pe-emoji').value.trim() || '📁';
+  const status   = document.getElementById('pe-status').value;
+  const progress = parseInt(document.getElementById('pe-progress').value) || 0;
+  const client   = document.getElementById('pe-client').value.trim();
+  const notes    = document.getElementById('pe-notes').value.trim();
+
+  if (!name || !cat || !desc) { toast('Fill required fields', 'error'); return; }
+
+  const data = { name, cat, desc, tags, url, emoji, status, progress, client, notes, updatedAt: serverTimestamp() };
+
+  try {
+    if (pEditId) {
+      await updateDoc(doc(db, 'projects', pEditId), data);
+      toast('Project updated! ✓', 'success');
+    } else {
+      data.createdAt = serverTimestamp();
+      await addDoc(collection(db, 'projects'), data);
+      toast('Project added! ✓', 'success');
+    }
+    closeM('projModal');
+  } catch (e) { toast('Error: ' + e.message, 'error'); }
+};
+
+window.delProj = async function(id) {
+  await deleteDoc(doc(db, 'projects', id));
+  toast('Project deleted', 'success');
+};
+
+/* ══════════════════════════════════════
+   ADMIN MANAGEMENT (Main Admin only)
+══════════════════════════════════════ */
+let adminsCache = [];
+
+function subscribeAdmins() {
+  unsubAdmins = onSnapshot(collection(db, 'admins'), snap => {
+    adminsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderAdmins();
+    renderDash();
+  });
+}
+
+function renderAdmins() {
+  const pending  = adminsCache.filter(a => a.status === 'pending');
+  const approved = adminsCache.filter(a => a.status === 'approved');
+  const rejected = adminsCache.filter(a => a.status === 'rejected');
+
+  document.getElementById('adm-pending-count').textContent  = pending.length;
+  document.getElementById('adm-approved-count').textContent = approved.length;
+
+  const el = document.getElementById('adm-list');
+  if (!el) return;
+
+  const allAdmins = [...pending, ...approved, ...rejected];
+  el.innerHTML = !allAdmins.length ? '<div class="empty"><div class="empty-ico">👥</div><div class="empty-txt">No admin requests yet</div></div>' :
+    allAdmins.map(a => `
+      <div class="adm-card ${a.status}">
+        <div class="adm-top">
+          <div>
+            <div class="adm-name">${esc(a.displayName || a.email)}</div>
+            <div class="adm-email">${esc(a.email)}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+            ${a.status === 'pending'  ? '<span class="badge b-gold">⏳ Pending Approval</span>' : ''}
+            ${a.status === 'approved' ? '<span class="badge b-mint">✓ Approved</span>'          : ''}
+            ${a.status === 'rejected' ? '<span class="badge b-red">✕ Rejected</span>'           : ''}
+            <span style="font-family:JetBrains Mono,monospace;font-size:.58rem;color:var(--txt3)">${fmtTS(a.requestedAt)}</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+          ${a.status !== 'approved' ? `<button class="btn btn-success btn-sm" onclick="approveAdmin('${a.id}','${esc(a.email)}')">✓ Approve</button>` : ''}
+          ${a.status !== 'rejected' ? `<button class="btn btn-danger btn-sm" onclick="rejectAdmin('${a.id}')">✕ Reject</button>`  : ''}
+          ${a.status === 'approved' ? `<button class="btn btn-danger btn-sm" onclick="revokeAdmin('${a.id}')">⊘ Revoke Access</button>` : ''}
+        </div>
+      </div>`).join('');
+}
+
+window.approveAdmin = async function(id, email) {
+  await updateDoc(doc(db, 'admins', id), { status: 'approved', approvedAt: serverTimestamp() });
+  // Send notification email via Gmail
+  const subject = 'Feature Designz Admin Access Approved';
+  const body = `Hi!\n\nYour admin access for Feature Designz has been APPROVED by the main administrator.\n\nYou can now log in at:\nhttps://oshanmax.github.io/featuredesignz/admin.html\n\nBest regards,\nFeature Designz Main Admin`;
+  window.open('mailto:' + encodeURIComponent(email) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body), '_blank');
+  toast('Admin approved! Gmail opened to notify them.', 'success');
+};
+
+window.rejectAdmin = async function(id) {
+  await updateDoc(doc(db, 'admins', id), { status: 'rejected', rejectedAt: serverTimestamp() });
+  toast('Admin request rejected', 'success');
+};
+
+window.revokeAdmin = async function(id) {
+  await updateDoc(doc(db, 'admins', id), { status: 'rejected', revokedAt: serverTimestamp() });
+  toast('Admin access revoked', 'success');
+};
+
+/* ══════════════════════════════════════
+   DASHBOARD
+══════════════════════════════════════ */
+window.renderDash = function() {
+  const p = projectsCache, m = messagesCache;
+  const ur = m.filter(x => !x.read).length;
+  const rp = m.filter(x => x.replied).length;
+  const compl = p.filter(x => x.status === 'completed' || x.progress >= 100).length;
+
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('st-proj', p.length);
+  set('st-msg', m.length);
+  set('st-unread', ur);
+  set('st-replied', rp);
+  set('st-complete', compl);
+  set('st-progress', p.filter(x => x.status === 'inprogress').length);
+
+  const dmEl = document.getElementById('d-msgs');
+  if (dmEl) dmEl.innerHTML = !m.length
+    ? '<div class="empty" style="padding:20px"><div class="empty-ico">📭</div><div class="empty-txt">No messages yet</div></div>'
+    : m.slice(0, 4).map(x => `
+        <div style="padding:9px 0;border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:600;font-size:.86rem">${esc(x.name)}</div>
+            <div style="font-size:.73rem;color:var(--txt3)">${esc(x.email)}</div>
+          </div>
+          <div style="display:flex;gap:5px;align-items:center">
+            ${!x.read ? '<span class="badge b-blue">New</span>' : ''}
+            ${x.replied ? '<span class="badge b-mint">Replied</span>' : ''}
+            <span style="font-family:JetBrains Mono,monospace;font-size:.58rem;color:var(--txt3)">${fmtTS(x.date)}</span>
+          </div>
+        </div>`).join('');
+
+  const dpEl = document.getElementById('d-projs');
+  if (dpEl) dpEl.innerHTML = !p.length
+    ? '<div class="empty" style="padding:20px"><div class="empty-ico">📁</div><div class="empty-txt">No projects yet</div></div>'
+    : p.slice(0, 4).map(x => `
+        <div style="padding:9px 0;border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center">
+          <div style="display:flex;align-items:center;gap:9px">
+            <span style="font-size:1.2rem">${x.emoji || '📁'}</span>
+            <div>
+              <div style="font-weight:600;font-size:.86rem">${esc(x.name)}</div>
+              <div style="font-size:.73rem;color:var(--txt3)">${x.progress || 0}% complete</div>
+            </div>
+          </div>
+          ${statusBadge(x.status, x.progress)}
+        </div>`).join('');
+
+  if (currentRole === 'main_admin') {
+    const pending = adminsCache.filter(a => a.status === 'pending').length;
+    const pBadge = document.getElementById('adm-pending-badge');
+    if (pBadge) { pBadge.textContent = pending; pBadge.style.display = pending ? 'flex' : 'none'; }
+  }
+};
+
+/* ══════════════════════════════════════
+   SETTINGS
+══════════════════════════════════════ */
+window.saveGmailSettings = function() {
+  const email = document.getElementById('set-gmail').value.trim();
+  const subj  = document.getElementById('set-subj').value.trim();
+  if (!email) { toast('Enter Gmail address', 'error'); return; }
+  localStorage.setItem('fd_gmail', JSON.stringify({ email, subj }));
+  toast('Gmail settings saved!', 'success');
+};
+
+/* ══════════════════════════════════════
+   NAV
+══════════════════════════════════════ */
+window.gotoPage = function(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sb-it').forEach(i => i.classList.remove('on'));
+  const pg = document.getElementById('page-' + id);
+  if (pg) pg.classList.add('active');
+  document.querySelectorAll('.sb-it').forEach(i => {
+    if (i.getAttribute('onclick')?.includes("'" + id + "'")) i.classList.add('on');
+  });
+  const titles = { dashboard:'Dashboard', projects:'All Projects', project_view:'Projects Overview', messages:'Messages', services:'Services Status', youtube:'YouTube Section', admins:'Admin Management', settings:'Settings' };
+  const el = document.getElementById('tb-title');
+  if (el) el.textContent = titles[id] || id;
+  if (id === 'dashboard') renderDash();
+  if (id === 'project_view') renderProjectsSection();
+  if (id === 'services') renderServicePage();
+  if (id === 'youtube')  renderYoutubePage();
+  if (id === 'messages') renderMessages();
+  if (id === 'projects') renderProjects();
+};
+
+/* ══════════════════════════════════════
+   HELPERS
+══════════════════════════════════════ */
+const esc = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+function fmtTS(ts) {
+  if (!ts) return '—';
+  let d;
+  if (ts && ts.toDate) d = ts.toDate();
+  else if (ts && ts.seconds) d = new Date(ts.seconds * 1000);
+  else d = new Date(ts);
+  if (isNaN(d)) return '—';
+  return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+const catL = { web:'Web Dev', mobile:'Mobile App', design:'Graphics Design', video:'Video Editing' };
+const catB = { web:'b-blue', mobile:'b-cyan', design:'b-gold', video:'b-pink' };
+
+function statusBadge(status, progress = 0) {
+  const pct = parseInt(progress) || 0;
+  if (status === 'off')         return '<span class="badge b-red">🚫 Off</span>';
+  if (status === 'update_soon') return '<span class="badge b-cyan">🔄 Update Soon</span>';
+  if (status === 'paused')      return '<span class="badge b-grey">⏸ Paused</span>';
+  if (status === 'inprogress')  return '<span class="badge b-blue">⟳ In Progress</span>';
+  if (status === 'completed' || pct >= 100) return '<span class="badge b-mint">✓ Completed</span>';
+  return '<span class="badge b-grey">' + (status || 'Unknown') + '</span>';
+}
+
+window.openM   = id => document.getElementById(id)?.classList.add('open');
+window.closeM  = id => document.getElementById(id)?.classList.remove('open');
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.modal-bg').forEach(b =>
+    b.addEventListener('click', e => { if (e.target === b) b.classList.remove('open'); }));
+});
+
+let cfmCb = null;
+window.cfm = function(title, msg, cb) {
+  document.getElementById('cfm-title').textContent = title;
+  document.getElementById('cfm-msg').textContent = msg;
+  cfmCb = cb;
+  document.getElementById('cfmDlg').classList.add('open');
+};
+window.closeCfm = function() {
+  document.getElementById('cfmDlg').classList.remove('open');
+  cfmCb = null;
+};
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('cfm-ok').onclick = () => { if (cfmCb) cfmCb(); closeCfm(); };
+});
+
+let tTimer;
+window.toast = function(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  document.getElementById('t-ico').textContent = type === 'success' ? '✓' : '✕';
+  document.getElementById('t-msg').textContent = msg;
+  el.className = 'show ' + type;
+  clearTimeout(tTimer);
+  tTimer = setTimeout(() => el.classList.remove('show'), 4000);
+};
+
+// Progress slider live update
+window.updateProgress = function(val) {
+  document.getElementById('pe-prog-val').textContent = val + '%';
+  const status = document.getElementById('pe-status');
+  if (parseInt(val) >= 100) status.value = 'completed';
+  else if (parseInt(val) > 0) status.value = 'inprogress';
+};
+</script>
+
 <style>
 :root {
-  --bg0:   #020510;
-  --bg1:   #050c1e;
-  --bg2:   #07112b;
-  --bg3:   #0c1a3a;
-  --bg4:   #122045;
-  --bdr:   rgba(82,130,255,0.1);
-  --bdr2:  rgba(82,130,255,0.22);
-  --bdr3:  rgba(82,130,255,0.4);
-  --blue:  #5282ff;
-  --blue2: #7ba4ff;
-  --cyan:  #38d9f5;
-  --mint:  #3ef0b8;
-  --gold:  #f5c842;
-  --pink:  #f06090;
-  --red:   #f87171;
-  --green: #34d399;
-  --txt:   #dde6ff;
-  --txt2:  #8899cc;
-  --txt3:  #4a5880;
-  --glow:  rgba(82,130,255,0.2);
-  --sw:    260px;
+  --bg0:#020510;--bg1:#050c1e;--bg2:#07112b;--bg3:#0c1a3a;--bg4:#122045;
+  --bdr:rgba(82,130,255,0.1);--bdr2:rgba(82,130,255,0.22);--bdr3:rgba(82,130,255,0.4);
+  --blue:#5282ff;--blue2:#7ba4ff;--cyan:#38d9f5;--mint:#3ef0b8;--gold:#f5c842;
+  --pink:#f06090;--red:#f87171;--green:#34d399;--txt:#dde6ff;--txt2:#8899cc;--txt3:#4a5880;
+  --glow:rgba(82,130,255,0.2);--sw:264px;
 }
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 html{font-size:15px}
-body{font-family:'Inter',sans-serif;background:var(--bg0);color:var(--txt);min-height:100vh;display:flex;overflow-x:hidden}
+body{font-family:'Inter',sans-serif;background:var(--bg0);color:var(--txt);min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9000;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='250'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='250' height='250' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");opacity:.5}
 
-/* grain */
-body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9000;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='250'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='250' height='250' filter='url(%23n)' opacity='0.028'/%3E%3C/svg%3E");opacity:.5}
+/* ── SCREENS ── */
+#loginScreen,#pendingScreen,#rejectedScreen{display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg0);align-items:center;justify-content:center}
+#appScreen{display:none;flex-direction:row;min-height:100vh;width:100%}
 
 /* ── LOGIN ── */
-#loginScreen{position:fixed;inset:0;z-index:99999;background:var(--bg0);display:flex;align-items:center;justify-content:center}
-.login-wrap{width:100%;max-width:420px;padding:20px}
-.login-box{background:var(--bg2);border:1px solid var(--bdr2);padding:52px 44px;position:relative;overflow:hidden}
+.login-box{background:var(--bg2);border:1px solid var(--bdr2);padding:52px 44px;width:100%;max-width:420px;position:relative;overflow:hidden}
 .login-box::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--blue),var(--cyan),var(--mint))}
-.login-brand{text-align:center;margin-bottom:40px}
-.login-hex{width:52px;height:52px;background:linear-gradient(135deg,var(--blue),var(--cyan));clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);display:inline-flex;align-items:center;justify-content:center;font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.3rem;color:#020510;margin-bottom:14px}
+.login-brand{text-align:center;margin-bottom:36px}
+.login-hex{width:50px;height:50px;background:linear-gradient(135deg,var(--blue),var(--cyan));clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);display:inline-flex;align-items:center;justify-content:center;font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.3rem;color:#020510;margin-bottom:12px}
 .login-title{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.7rem;letter-spacing:-.04em}
 .login-title em{color:var(--blue);font-style:normal}
-.login-sub{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.22em;text-transform:uppercase;color:var(--txt3);margin-top:7px}
-.lg{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
-.lg-lbl{font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3)}
-.lg-inp{background:var(--bg3);border:1px solid var(--bdr);color:var(--txt);padding:12px 14px;font-family:'Inter',sans-serif;font-size:.9rem;outline:none;transition:border-color .25s,box-shadow .25s;width:100%}
-.lg-inp:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(82,130,255,.09)}
-.lg-btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--blue),var(--cyan));color:#020510;border:none;font-family:'Inter',sans-serif;font-weight:700;font-size:.92rem;cursor:pointer;transition:opacity .3s,transform .2s;margin-top:8px}
-.lg-btn:hover{opacity:.9;transform:translateY(-1px)}
-.lg-err{color:var(--red);font-family:'JetBrains Mono',monospace;font-size:.7rem;letter-spacing:.06em;text-align:center;margin-top:10px;display:none}
-.lg-hint{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--txt3);text-align:center;margin-top:18px;line-height:1.7;border-top:1px solid var(--bdr);padding-top:16px}
+.login-sub{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--txt3);margin-top:6px}
+.lg{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.lg-lbl{font-family:'JetBrains Mono',monospace;font-size:.57rem;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3)}
+.lg-inp{background:var(--bg3);border:1px solid var(--bdr);color:var(--txt);padding:11px 13px;font-family:'Inter',sans-serif;font-size:.9rem;outline:none;transition:border-color .25s,box-shadow .25s;width:100%}
+.lg-inp:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(82,130,255,.08)}
+.lg-btn-main{width:100%;padding:13px;background:linear-gradient(135deg,var(--blue),var(--cyan));color:#020510;border:none;font-family:'Inter',sans-serif;font-weight:700;font-size:.9rem;cursor:pointer;transition:opacity .3s,transform .2s;margin-top:6px}
+.lg-btn-main:hover{opacity:.9;transform:translateY(-1px)}
+.lg-btn-main:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.lg-divider{display:flex;align-items:center;gap:12px;margin:14px 0;color:var(--txt3);font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.15em;text-transform:uppercase}
+.lg-divider::before,.lg-divider::after{content:'';flex:1;height:1px;background:var(--bdr)}
+.lg-btn-google{width:100%;padding:11px;background:transparent;border:1px solid var(--bdr2);color:var(--txt);font-family:'Inter',sans-serif;font-weight:600;font-size:.88rem;cursor:pointer;transition:all .25s;display:flex;align-items:center;justify-content:center;gap:10px}
+.lg-btn-google:hover{border-color:var(--blue);background:rgba(82,130,255,.06)}
+.lg-forgot{font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.08em;color:var(--blue);cursor:pointer;text-align:right;margin-top:8px;transition:opacity .25s}
+.lg-forgot:hover{opacity:.7}
+.lg-err{font-size:.82rem;text-align:center;margin-top:10px;display:none;padding:8px;background:rgba(248,113,113,.1)}
+.lg-hint{font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--txt3);text-align:center;margin-top:16px;line-height:1.7;border-top:1px solid var(--bdr);padding-top:14px}
 .lg-hint em{color:var(--blue);font-style:normal}
 
+/* ── PENDING / REJECTED ── */
+.status-box{background:var(--bg2);border:1px solid var(--bdr2);padding:48px 40px;text-align:center;max-width:440px;width:90%}
+.status-icon{font-size:3rem;margin-bottom:16px}
+.status-title{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.4rem;margin-bottom:10px}
+.status-desc{font-size:.9rem;color:var(--txt2);line-height:1.75;margin-bottom:24px}
+.status-email{font-family:'JetBrains Mono',monospace;font-size:.75rem;color:var(--blue);margin-bottom:20px}
+
 /* ── SIDEBAR ── */
-#app{display:none;width:100%;flex-direction:row}
 .sb{width:var(--sw);min-height:100vh;background:var(--bg1);border-right:1px solid var(--bdr);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;overflow-y:auto}
-.sb-brand{padding:22px 20px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px}
+.sb-brand{padding:20px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px}
 .sb-hex{width:30px;height:30px;background:linear-gradient(135deg,var(--blue),var(--cyan));clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);display:flex;align-items:center;justify-content:center;font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:.85rem;color:#020510;flex-shrink:0}
-.sb-name{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:.98rem;letter-spacing:-.03em}
+.sb-name{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:.96rem;letter-spacing:-.03em}
 .sb-name em{color:var(--blue);font-style:normal}
-.sb-admin{padding:7px 20px;font-family:'JetBrains Mono',monospace;font-size:.54rem;letter-spacing:.22em;text-transform:uppercase;color:var(--txt3);border-bottom:1px solid var(--bdr)}
+.sb-user{padding:14px 20px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px}
+.sb-avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--cyan));display:flex;align-items:center;justify-content:center;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:.8rem;color:#020510;flex-shrink:0}
+.sb-uname{font-size:.82rem;font-weight:600;line-height:1.3}
+.sb-uemail{font-size:.66rem;color:var(--txt3);font-family:'JetBrains Mono',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.role-badge{font-family:'JetBrains Mono',monospace;font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;margin-top:3px;display:inline-block}
+.role-main{background:rgba(245,200,66,.15);color:var(--gold)}
+.role-admin{background:rgba(82,130,255,.15);color:var(--blue2)}
+.sb-admin-tag{padding:6px 20px;font-family:'JetBrains Mono',monospace;font-size:.52rem;letter-spacing:.2em;text-transform:uppercase;color:var(--txt3);border-bottom:1px solid var(--bdr)}
 .sb-nav{flex:1;padding:10px 8px}
-.sb-sec{font-family:'JetBrains Mono',monospace;font-size:.52rem;letter-spacing:.22em;text-transform:uppercase;color:var(--txt3);padding:14px 12px 6px}
-.sb-it{display:flex;align-items:center;gap:10px;padding:9px 12px;color:var(--txt3);text-decoration:none;font-size:.85rem;font-weight:500;cursor:pointer;border:1px solid transparent;transition:all .2s;margin-bottom:2px}
+.sb-sec{font-family:'JetBrains Mono',monospace;font-size:.5rem;letter-spacing:.22em;text-transform:uppercase;color:var(--txt3);padding:12px 12px 5px}
+.sb-it{display:flex;align-items:center;gap:9px;padding:9px 12px;color:var(--txt3);font-size:.84rem;font-weight:500;cursor:pointer;border:1px solid transparent;transition:all .2s;margin-bottom:2px;position:relative}
 .sb-it:hover{color:var(--txt);background:rgba(82,130,255,.06);border-color:var(--bdr)}
 .sb-it.on{color:var(--blue);background:rgba(82,130,255,.09);border-color:rgba(82,130,255,.2)}
-.sb-ico{width:16px;flex-shrink:0;opacity:.75}
-.sb-badge{margin-left:auto;min-width:20px;height:18px;padding:0 5px;background:var(--red);color:white;font-size:.6rem;font-weight:700;display:flex;align-items:center;justify-content:center;border-radius:9px}
-.sb-foot{padding:14px 18px;border-top:1px solid var(--bdr)}
+.sb-ico{width:15px;flex-shrink:0;opacity:.75}
+.sb-badge{margin-left:auto;min-width:18px;height:18px;padding:0 5px;background:var(--red);color:white;font-size:.58rem;font-weight:700;display:flex;align-items:center;justify-content:center;border-radius:9px}
+.sb-foot{padding:12px 18px;border-top:1px solid var(--bdr)}
 .sb-out{width:100%;padding:9px;background:transparent;border:1px solid var(--bdr);color:var(--txt3);font-family:'Inter',sans-serif;font-size:.8rem;cursor:pointer;transition:all .25s;display:flex;align-items:center;gap:8px;justify-content:center}
 .sb-out:hover{border-color:var(--red);color:var(--red)}
+.sb-session{font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:.08em;color:var(--txt3);text-align:center;margin-top:8px}
 
 /* ── MAIN ── */
 .main{margin-left:var(--sw);flex:1;min-height:100vh;display:flex;flex-direction:column}
-.topbar{height:58px;background:var(--bg1);border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:50}
+.topbar{height:56px;background:var(--bg1);border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;padding:0 22px;position:sticky;top:0;z-index:50}
 .tb-title{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:1.05rem;letter-spacing:-.03em}
-.tb-r{display:flex;align-items:center;gap:14px}
-.tb-time{font-family:'JetBrains Mono',monospace;font-size:.63rem;letter-spacing:.1em;color:var(--txt3)}
+.tb-r{display:flex;align-items:center;gap:12px}
+.tb-time{font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.1em;color:var(--txt3)}
 .tb-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s ease infinite}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
-
-.content{padding:24px;flex:1}
+.content{padding:22px;flex:1}
 
 /* PAGES */
-.page{display:none}
-.page.active{display:block}
+.page{display:none}.page.active{display:block}
 
 /* DASH */
-.dash-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
-.dstat{background:var(--bg2);border:1px solid var(--bdr);padding:20px;position:relative;overflow:hidden}
+.dash-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+.dash-stats-row2{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+.dstat{background:var(--bg2);border:1px solid var(--bdr);padding:18px;position:relative;overflow:hidden}
 .dstat::after{content:'';position:absolute;top:0;left:0;right:0;height:2px}
-.dstat.s1::after{background:linear-gradient(90deg,var(--blue),var(--cyan))}
-.dstat.s2::after{background:linear-gradient(90deg,var(--gold),var(--pink))}
-.dstat.s3::after{background:linear-gradient(90deg,var(--red),var(--pink))}
-.dstat.s4::after{background:linear-gradient(90deg,var(--mint),var(--cyan))}
-.ds-lbl{font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:.18em;text-transform:uppercase;color:var(--txt3);margin-bottom:8px}
-.ds-val{font-family:'Bricolage Grotesque',sans-serif;font-size:2.2rem;font-weight:800;line-height:1}
+.s1::after{background:linear-gradient(90deg,var(--blue),var(--cyan))}
+.s2::after{background:linear-gradient(90deg,var(--gold),var(--pink))}
+.s3::after{background:linear-gradient(90deg,var(--red),var(--pink))}
+.s4::after{background:linear-gradient(90deg,var(--mint),var(--cyan))}
+.s5::after{background:linear-gradient(90deg,var(--mint),var(--green))}
+.s6::after{background:linear-gradient(90deg,var(--blue),var(--pink))}
+.ds-lbl{font-family:'JetBrains Mono',monospace;font-size:.55rem;letter-spacing:.18em;text-transform:uppercase;color:var(--txt3);margin-bottom:8px}
+.ds-val{font-family:'Bricolage Grotesque',sans-serif;font-size:2rem;font-weight:800;line-height:1}
 .ds-val.s1{background:linear-gradient(135deg,var(--blue),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .ds-val.s2{background:linear-gradient(135deg,var(--gold),var(--pink));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.ds-val.s3{color:var(--red)}
-.ds-val.s4{color:var(--mint)}
-.ds-sub{font-size:.75rem;color:var(--txt3);margin-top:5px}
-
+.ds-val.s3{color:var(--red)}.ds-val.s4{color:var(--mint)}.ds-val.s5{color:var(--green)}.ds-val.s6{color:var(--blue2)}
+.ds-sub{font-size:.73rem;color:var(--txt3);margin-top:4px}
 .dash-panels{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.dpanel{background:var(--bg2);border:1px solid var(--bdr);padding:20px}
-.dp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-.dp-title{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:.95rem}
-.dp-link{font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);cursor:pointer}
+.dpanel{background:var(--bg2);border:1px solid var(--bdr);padding:18px}
+.dp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.dp-title{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:.92rem}
+.dp-link{font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);cursor:pointer}
 .dp-link:hover{text-decoration:underline}
 
-/* PAGE HEADER */
-.ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
-.ph-title{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.55rem;letter-spacing:-.04em}
+/* PH */
+.ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.ph-title{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.5rem;letter-spacing:-.04em}
 .ph-title em{font-style:italic;color:var(--blue)}
 
 /* BUTTONS */
-.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 20px;font-family:'Inter',sans-serif;font-weight:600;font-size:.82rem;cursor:pointer;transition:all .25s;border:none}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;font-family:'Inter',sans-serif;font-weight:600;font-size:.8rem;cursor:pointer;transition:all .25s;border:none}
 .btn-primary{background:linear-gradient(135deg,var(--blue),var(--cyan));color:#020510}
 .btn-primary:hover{opacity:.9;transform:translateY(-1px)}
 .btn-ghost{background:transparent;color:var(--txt3);border:1px solid var(--bdr)}
@@ -128,27 +967,31 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9000;
 .btn-danger:hover{background:var(--red);color:white}
 .btn-success{background:transparent;color:var(--mint);border:1px solid rgba(62,240,184,.3)}
 .btn-success:hover{background:var(--mint);color:#020510}
-.btn-gmail{background:#ea4335;color:white;border:none}
+.btn-gmail{background:#ea4335;color:white}
 .btn-gmail:hover{opacity:.9;box-shadow:0 6px 20px rgba(234,67,53,.35)}
-.btn-sm{padding:5px 13px;font-size:.76rem}
+.btn-sm{padding:5px 12px;font-size:.74rem}
+.btn:disabled{opacity:.5;cursor:not-allowed}
 
-/* FILTER BAR */
-.fbar{display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap}
+/* FILTER */
+.fbar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
 .fsearch{flex:1;min-width:180px;background:var(--bg2);border:1px solid var(--bdr);color:var(--txt);padding:9px 13px;font-family:'Inter',sans-serif;font-size:.85rem;outline:none;transition:border-color .25s}
 .fsearch:focus{border-color:var(--blue)}
-.fsel{background:var(--bg2);border:1px solid var(--bdr);color:var(--txt3);padding:9px 13px;font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;outline:none;cursor:pointer}
-.fsel:focus{border-color:var(--blue)}
+.fsel{background:var(--bg2);border:1px solid var(--bdr);color:var(--txt3);padding:9px 12px;font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;outline:none;cursor:pointer}
 
 /* TABLE */
-.tbl{background:var(--bg2);border:1px solid var(--bdr);overflow:hidden}
-table{width:100%;border-collapse:collapse}
-th{font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3);padding:11px 14px;text-align:left;border-bottom:1px solid var(--bdr);background:var(--bg3)}
-td{padding:11px 14px;border-bottom:1px solid rgba(82,130,255,.05);font-size:.85rem;vertical-align:middle}
+.tbl{background:var(--bg2);border:1px solid var(--bdr);overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:900px}
+th{font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3);padding:10px 13px;text-align:left;border-bottom:1px solid var(--bdr);background:var(--bg3);white-space:nowrap}
+td{padding:10px 13px;border-bottom:1px solid rgba(82,130,255,.05);font-size:.83rem;vertical-align:middle}
 tr:last-child td{border-bottom:none}
 tr:hover td{background:rgba(82,130,255,.03)}
 
+/* PROGRESS */
+.progress-wrap{width:100%;height:5px;background:var(--bg3);overflow:hidden;border-radius:0}
+.progress-bar{height:100%;background:linear-gradient(90deg,var(--blue),var(--cyan));transition:width .4s}
+
 /* BADGES */
-.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:.08em;text-transform:uppercase}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;font-family:'JetBrains Mono',monospace;font-size:.54rem;letter-spacing:.08em;text-transform:uppercase}
 .b-blue{background:rgba(82,130,255,.15);color:var(--blue2)}
 .b-cyan{background:rgba(56,217,245,.15);color:var(--cyan)}
 .b-gold{background:rgba(245,200,66,.15);color:var(--gold)}
@@ -160,77 +1003,119 @@ tr:hover td{background:rgba(82,130,255,.03)}
 
 /* MESSAGES */
 .msg-list{display:flex;flex-direction:column;gap:10px}
-.mcard{background:var(--bg2);border:1px solid var(--bdr);padding:18px 20px;position:relative;transition:border-color .25s}
+.mcard{background:var(--bg2);border:1px solid var(--bdr);padding:18px 20px;transition:border-color .25s}
 .mcard.unread{border-left:3px solid var(--blue)}
 .mcard.replied{border-left:3px solid var(--mint)}
 .mc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px}
-.mc-sender{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:.98rem}
-.mc-email{font-size:.78rem;color:var(--txt3);margin-top:2px}
+.mc-sender{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:.95rem}
+.mc-email{font-size:.76rem;color:var(--txt3);margin-top:2px}
 .mc-meta{display:flex;flex-direction:column;align-items:flex-end;gap:5px}
-.mc-date{font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.07em;color:var(--txt3)}
+.mc-date{font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:.06em;color:var(--txt3)}
 .mc-badges{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
-.mc-service-budget{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
-.mc-body{font-size:.86rem;color:var(--txt2);line-height:1.75;margin-bottom:12px}
-.mc-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.mc-srv-bgt{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:9px}
+.mc-body{font-size:.84rem;color:var(--txt2);line-height:1.75;margin-bottom:11px}
+.mc-actions{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.reply-box{margin-top:10px;background:rgba(62,240,184,.05);border:1px solid rgba(62,240,184,.2);border-left:3px solid var(--mint);padding:12px 14px}
+.reply-lbl{font-family:'JetBrains Mono',monospace;font-size:.53rem;letter-spacing:.14em;text-transform:uppercase;color:var(--mint);margin-bottom:5px;display:flex;align-items:center;gap:5px}
+.reply-text{font-size:.82rem;color:var(--txt2);line-height:1.7;white-space:pre-line}
 
-/* GMAIL REPLY BOX */
-.gmail-preview{
-  margin-top:14px;background:var(--bg3);border:1px solid var(--bdr2);border-left:3px solid #ea4335;
-  padding:14px 16px;display:none;
-}
-.gmail-preview.open{display:block}
-.gp-label{font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:.16em;text-transform:uppercase;color:#ea4335;margin-bottom:6px;display:flex;align-items:center;gap:6px}
-.gp-to{font-size:.8rem;color:var(--txt3);margin-bottom:6px;font-family:'JetBrains Mono',monospace}
-.gp-to em{color:var(--txt2);font-style:normal}
-.gp-reply-text{font-size:.86rem;color:var(--txt2);line-height:1.75;border-top:1px solid var(--bdr);padding-top:10px;margin-top:8px;white-space:pre-wrap}
+/* PROJECT VIEW */
+.pv-tabs{display:flex;gap:0;margin-bottom:20px;border-bottom:1px solid var(--bdr)}
+.pv-tab{padding:10px 24px;font-family:'JetBrains Mono',monospace;font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:var(--txt3);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;display:flex;align-items:center;gap:8px}
+.pv-tab.on{color:var(--blue);border-bottom-color:var(--blue)}
+.pv-tab:hover{color:var(--txt)}
+.pv-count{min-width:18px;height:18px;padding:0 5px;background:var(--bg3);border:1px solid var(--bdr);font-size:.58rem;display:flex;align-items:center;justify-content:center;border-radius:9px}
+.pv-tab.on .pv-count{background:rgba(82,130,255,.2);border-color:rgba(82,130,255,.3);color:var(--blue)}
+.pv-panel{display:none}.pv-panel.on{display:block}
+.proj-cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+.proj-card-view{background:var(--bg2);border:1px solid var(--bdr);padding:22px;transition:border-color .3s,transform .3s}
+.proj-card-view:hover{border-color:var(--bdr2);transform:translateY(-3px)}
+.pcv-top{display:flex;align-items:flex-start;gap:14px;margin-bottom:12px}
+.pcv-name{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:1.05rem;letter-spacing:-.02em;line-height:1.2}
+.pcv-desc{font-size:.82rem;color:var(--txt2);line-height:1.7;margin-bottom:14px}
+.pcv-progress-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.pcv-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px}
+.chip{font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;padding:4px 9px;border:1px solid var(--bdr);color:var(--txt3)}
+.pcv-footer{font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--txt3);display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--bdr)}
+
+/* ADMIN CARDS */
+.adm-card{background:var(--bg2);border:1px solid var(--bdr);padding:18px 20px;margin-bottom:10px}
+.adm-card.pending{border-left:3px solid var(--gold)}
+.adm-card.approved{border-left:3px solid var(--mint)}
+.adm-card.rejected{border-left:3px solid var(--red)}
+.adm-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.adm-name{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:.96rem}
+.adm-email{font-size:.76rem;color:var(--txt3);font-family:'JetBrains Mono',monospace;margin-top:2px}
 
 /* MODAL */
-.modal-bg{position:fixed;inset:0;background:rgba(2,5,16,.88);z-index:500;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s}
+.modal-bg{position:fixed;inset:0;background:rgba(2,5,16,.9);z-index:500;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s}
 .modal-bg.open{opacity:1;pointer-events:all}
-.modal{background:var(--bg2);border:1px solid var(--bdr2);width:100%;max-width:600px;max-height:92vh;overflow-y:auto;position:relative}
-.modal::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--blue),var(--cyan))}
-.mh{padding:22px 26px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between}
-.mh-title{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:1.1rem}
-.mc-x{background:none;border:1px solid var(--bdr);color:var(--txt3);width:30px;height:30px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.modal{background:var(--bg2);border:1px solid var(--bdr2);width:100%;max-width:620px;max-height:92vh;overflow-y:auto;position:relative}
+.modal::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--blue),var(--cyan),var(--mint))}
+.mh{padding:20px 24px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between}
+.mh-title{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:1.05rem}
+.mc-x{background:none;border:1px solid var(--bdr);color:var(--txt3);width:28px;height:28px;cursor:pointer;font-size:.9rem;display:flex;align-items:center;justify-content:center;transition:all .2s}
 .mc-x:hover{border-color:var(--red);color:var(--red)}
-.mb{padding:24px 26px}
-.mf{padding:14px 26px;border-top:1px solid var(--bdr);display:flex;gap:10px;justify-content:flex-end}
-
-/* FORM INSIDE MODAL */
-.fg{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.mb{padding:22px 24px}
+.mf{padding:14px 24px;border-top:1px solid var(--bdr);display:flex;gap:10px;justify-content:flex-end}
+.fg{display:flex;flex-direction:column;gap:6px;margin-bottom:13px}
 .fg:last-child{margin-bottom:0}
-.fl{font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3)}
-.fi,.fsel2,.fta{background:var(--bg3);border:1px solid var(--bdr);color:var(--txt);padding:11px 13px;font-family:'Inter',sans-serif;font-size:.88rem;outline:none;resize:none;transition:border-color .25s,box-shadow .25s;width:100%}
+.fl{font-family:'JetBrains Mono',monospace;font-size:.57rem;letter-spacing:.15em;text-transform:uppercase;color:var(--txt3)}
+.fi,.fsel2,.fta{background:var(--bg3);border:1px solid var(--bdr);color:var(--txt);padding:10px 13px;font-family:'Inter',sans-serif;font-size:.88rem;outline:none;resize:none;transition:border-color .25s,box-shadow .25s;width:100%}
 .fi:focus,.fsel2:focus,.fta:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(82,130,255,.08)}
-.fta{min-height:90px}
+.fta{min-height:80px}
 .fsel2 option{background:var(--bg2)}
 .fr{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-
-/* GMAIL COMPOSE MODAL */
-.gmail-compose{background:var(--bg3);border:1px solid rgba(234,67,53,.25);padding:18px;margin-bottom:14px}
-.gc-header{display:flex;align-items:center;gap:10px;margin-bottom:14px}
-.gc-gmail-icon{width:28px;height:28px;display:flex;align-items:center;justify-content:center}
-.gc-title{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:1rem;color:#ea4335}
-.gc-field{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--bdr)}
-.gc-lbl{font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:var(--txt3);width:48px;flex-shrink:0;padding-top:2px}
-.gc-val{font-size:.86rem;color:var(--txt2)}
-.gc-val.editable{color:var(--txt)}
-.gc-note{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--txt3);margin-top:10px;line-height:1.6;display:flex;align-items:flex-start;gap:6px}
-.gc-note::before{content:'ℹ';color:var(--blue);font-size:.9rem}
+.progress-slider{width:100%;accent-color:var(--blue);cursor:pointer}
+.prog-display{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:1.6rem;color:var(--blue);text-align:center;margin:4px 0}
 
 /* SETTINGS */
-.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.sp{background:var(--bg2);border:1px solid var(--bdr);padding:22px}
-.sp-title{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:.95rem;margin-bottom:18px;display:flex;align-items:center;gap:8px}
-.sp-title::before{content:'';width:16px;height:2px;background:linear-gradient(90deg,var(--blue),var(--cyan))}
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.sp{background:var(--bg2);border:1px solid var(--bdr);padding:20px}
+.sp-title{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:.92rem;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.sp-title::before{content:'';width:14px;height:2px;background:linear-gradient(90deg,var(--blue),var(--cyan))}
+
+/* GMAIL COMPOSE */
+.gmail-compose{background:rgba(234,67,53,.06);border:1px solid rgba(234,67,53,.25);padding:16px;margin-bottom:14px}
+.gc-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.gc-title{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:.92rem;color:#ea4335}
+.gc-field{display:flex;gap:8px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(234,67,53,.15)}
+.gc-lbl{font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:.12em;text-transform:uppercase;color:var(--txt3);width:44px;flex-shrink:0;padding-top:2px}
+.gc-val{font-size:.84rem;color:var(--txt2)}
+.gc-note{font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--txt3);line-height:1.6;display:flex;align-items:flex-start;gap:5px;margin-top:8px}
+
+/* SERVICES */
+.svc-status-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.svc-card-admin{background:var(--bg2);border:1px solid var(--bdr);padding:26px;position:relative;overflow:hidden;transition:border-color .3s}
+.svc-card-admin::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.svc-card-admin.s-web::before{background:linear-gradient(90deg,var(--blue),var(--cyan))}
+.svc-card-admin.s-mobile::before{background:linear-gradient(90deg,var(--gold),var(--pink))}
+.svc-card-admin.s-design::before{background:linear-gradient(90deg,var(--mint),var(--cyan))}
+.svc-card-admin.s-video::before{background:linear-gradient(90deg,var(--pink),var(--gold))}
+.svc-card-admin.status-off{opacity:.6}
+.sca-icon{font-size:2.2rem;margin-bottom:12px}
+.sca-name{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:1.1rem;letter-spacing:-.03em;margin-bottom:6px}
+.sca-desc{font-size:.8rem;color:var(--txt3);line-height:1.65;margin-bottom:18px}
+.sca-current{margin-bottom:14px;display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.1em}
+.sca-current-lbl{color:var(--txt3);text-transform:uppercase;letter-spacing:.14em}
+.status-toggle-row{display:flex;gap:8px;flex-wrap:wrap}
+.stog{
+  font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;
+  padding:8px 16px;border:1px solid var(--bdr);background:transparent;color:var(--txt3);
+  cursor:pointer;transition:all .25s;flex:1;text-align:center;
+}
+.stog:hover{border-color:var(--bdr2);color:var(--txt)}
+.stog.active-avail{background:rgba(62,240,184,.15);border-color:rgba(62,240,184,.4);color:var(--mint)}
+.stog.active-soon{background:rgba(245,200,66,.15);border-color:rgba(245,200,66,.4);color:var(--gold)}
+.stog.active-off{background:rgba(74,88,128,.2);border-color:rgba(74,88,128,.4);color:var(--txt3)}
 
 /* EMPTY */
-.empty{text-align:center;padding:52px 20px;color:var(--txt3)}
-.empty-ico{font-size:2.8rem;margin-bottom:14px;opacity:.5}
-.empty-txt{font-size:.88rem;line-height:1.7}
+.empty{text-align:center;padding:48px 20px;color:var(--txt3)}
+.empty-ico{font-size:2.6rem;margin-bottom:12px;opacity:.5}
+.empty-txt{font-size:.86rem;line-height:1.7}
 
 /* TOAST */
-#toast{position:fixed;bottom:24px;right:24px;z-index:9000;background:var(--bg2);border:1px solid var(--bdr2);padding:12px 18px;transform:translateY(70px);opacity:0;transition:all .3s;display:flex;align-items:center;gap:10px;max-width:320px}
+#toast{position:fixed;bottom:22px;right:22px;z-index:9000;background:var(--bg2);border:1px solid var(--bdr2);padding:11px 16px;transform:translateY(70px);opacity:0;transition:all .3s;display:flex;align-items:center;gap:9px;max-width:310px;font-size:.85rem}
 #toast.show{transform:translateY(0);opacity:1}
 #toast.success{border-color:rgba(62,240,184,.4)}
 #toast.error{border-color:rgba(248,113,113,.4)}
@@ -238,9 +1123,9 @@ tr:hover td{background:rgba(82,130,255,.03)}
 /* CONFIRM */
 .cfm-bg{position:fixed;inset:0;background:rgba(2,5,16,.92);z-index:600;display:none;align-items:center;justify-content:center}
 .cfm-bg.open{display:flex}
-.cfm{background:var(--bg2);border:1px solid var(--bdr2);padding:32px;max-width:380px;width:90%;text-align:center}
-.cfm h3{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:1.15rem;margin-bottom:10px}
-.cfm p{color:var(--txt3);font-size:.86rem;margin-bottom:22px;line-height:1.65}
+.cfm{background:var(--bg2);border:1px solid var(--bdr2);padding:30px;max-width:360px;width:90%;text-align:center}
+.cfm h3{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:1.1rem;margin-bottom:9px}
+.cfm p{color:var(--txt3);font-size:.84rem;margin-bottom:20px;line-height:1.6}
 .cfm-btns{display:flex;gap:10px;justify-content:center}
 
 ::-webkit-scrollbar{width:4px}
@@ -250,73 +1135,130 @@ tr:hover td{background:rgba(82,130,255,.03)}
 </head>
 <body>
 
-<!-- LOGIN -->
+<!-- LOGIN SCREEN -->
 <div id="loginScreen">
-  <div class="login-wrap">
-    <div class="login-box">
-      <div class="login-brand">
-        <div style="display:flex;justify-content:center;margin-bottom:12px"><div class="login-hex">F</div></div>
-        <div class="login-title">Feature<em>Designz</em></div>
-        <div class="login-sub">Admin Panel · Secure Access</div>
+  <div class="login-box">
+    <div class="login-brand">
+      <div style="display:flex;justify-content:center;margin-bottom:12px">
+        <div class="login-hex">F</div>
       </div>
-      <div class="lg"><label class="lg-lbl">Username</label><input class="lg-inp" id="lu" type="text" placeholder="admin" autocomplete="username"></div>
-      <div class="lg"><label class="lg-lbl">Password</label><input class="lg-inp" id="lp" type="password" placeholder="••••••••" autocomplete="current-password"></div>
-      <button class="lg-btn" onclick="doLogin()">Sign In →</button>
-      <div class="lg-err" id="lerr">Invalid username or password.</div>
-      <div class="lg-hint">
-        Default: <em>admin</em> / <em>featuredesignz2025</em><br>
-        Change password in Settings after login.
-      </div>
+      <div class="login-title">Feature<em>Designz</em></div>
+      <div class="login-sub">Admin Panel · Secure Access</div>
+    </div>
+    <div class="lg"><label class="lg-lbl">Email Address</label>
+      <input class="lg-inp" id="l-email" type="email" placeholder="your@gmail.com" autocomplete="email"></div>
+    <div class="lg"><label class="lg-lbl">Password</label>
+      <input class="lg-inp" id="l-pass" type="password" placeholder="••••••••" autocomplete="current-password"
+        onkeydown="if(event.key==='Enter')loginEmail()"></div>
+    <button class="lg-btn-main" id="l-btn" onclick="loginEmail()">Sign In →</button>
+    <div onclick="forgotPassword()" class="lg-forgot">Forgot Password? Reset via Gmail →</div>
+    <div class="lg-divider">or</div>
+    <button class="lg-btn-google" id="l-btn-g" onclick="loginGoogle()">
+      <svg width="18" height="18" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+      Continue with Google
+    </button>
+    <div class="lg-err" id="l-err"></div>
+    <div class="lg-hint">
+      Session expires after <em>3 days</em> automatically.<br>
+      New admins require <em>main admin approval</em>.
     </div>
   </div>
 </div>
 
-<!-- APP -->
-<div id="app">
+<!-- PENDING SCREEN -->
+<div id="pendingScreen" style="display:none">
+  <div class="status-box">
+    <div class="status-icon">⏳</div>
+    <div class="status-title">Approval Pending</div>
+    <div class="status-email" id="pending-email"></div>
+    <div class="status-desc">Your admin access request has been submitted. The main administrator will review and approve your account.<br><br>You'll receive a Gmail notification once approved.</div>
+    <button class="btn btn-ghost" onclick="doLogout()">← Back to Login</button>
+  </div>
+</div>
+
+<!-- REJECTED SCREEN -->
+<div id="rejectedScreen" style="display:none">
+  <div class="status-box">
+    <div class="status-icon">❌</div>
+    <div class="status-title">Access Denied</div>
+    <div class="status-desc">Your admin access request was not approved. Please contact the main administrator at <strong><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="e18e9289808f929485898093808a80d0a1868c80888dcf828e8c">[email&#160;protected]</a></strong> if you believe this is an error.</div>
+    <button class="btn btn-ghost" onclick="doLogout()">← Back to Login</button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="appScreen" style="display:none">
   <!-- SIDEBAR -->
   <aside class="sb">
     <div class="sb-brand">
       <div class="sb-hex">F</div>
       <span class="sb-name">Feature<em>Designz</em></span>
     </div>
-    <div class="sb-admin">// Admin Dashboard</div>
+    <div class="sb-user">
+      <div class="sb-avatar" id="app-avatar">A</div>
+      <div>
+        <div class="sb-uname" id="app-user-name">Admin</div>
+        <div class="sb-uemail" id="app-user-email"></div>
+        <div class="role-badge" id="app-role-badge">Admin</div>
+      </div>
+    </div>
+    <div class="sb-admin-tag">// Admin Dashboard</div>
     <nav class="sb-nav">
       <div class="sb-sec">Main</div>
-      <div class="sb-it on" onclick="goto('dashboard')">
+      <div class="sb-it on" onclick="gotoPage('dashboard')">
         <svg class="sb-ico" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/></svg>
         Dashboard
       </div>
-      <div class="sb-sec">Content</div>
-      <div class="sb-it" onclick="goto('projects')">
+      <div class="sb-sec">Projects</div>
+      <div class="sb-it" onclick="gotoPage('project_view')">
+        <svg class="sb-ico" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
+        Projects Overview
+      </div>
+      <div class="sb-it" onclick="gotoPage('projects')">
         <svg class="sb-ico" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z"/></svg>
-        Projects
+        Manage Projects
       </div>
       <div class="sb-sec">Communication</div>
-      <div class="sb-it" onclick="goto('messages')">
+      <div class="sb-it" onclick="gotoPage('messages')">
         <svg class="sb-ico" viewBox="0 0 20 20" fill="currentColor"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/></svg>
         Messages
         <span class="sb-badge" id="msgBadge" style="display:none">0</span>
       </div>
+      <div class="sb-sec">Website</div>
+      <div class="sb-it" onclick="gotoPage('services')">
+        <svg class="sb-ico" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
+        Services Status
+      </div>
+      <div class="sb-it" onclick="gotoPage('youtube')">
+        <svg class="sb-ico" viewBox="0 0 24 24" fill="currentColor"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg>
+        YouTube Section
+      </div>
       <div class="sb-sec">System</div>
-      <div class="sb-it" onclick="goto('settings')">
+      <div class="sb-it" id="tab-admins" onclick="gotoPage('admins')" style="display:none">
+        <svg class="sb-ico" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/></svg>
+        Admin Management
+        <span class="sb-badge" id="adm-pending-badge" style="display:none;background:var(--gold)">0</span>
+      </div>
+      <div class="sb-it" onclick="gotoPage('settings')">
         <svg class="sb-ico" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
         Settings
       </div>
     </nav>
     <div class="sb-foot">
       <button class="sb-out" onclick="doLogout()">
-        <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd"/></svg>
+        <svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd"/></svg>
         Sign Out
       </button>
+      <div class="sb-session" id="session-info">Session: 3 days remaining</div>
     </div>
   </aside>
 
   <!-- MAIN -->
   <div class="main">
     <div class="topbar">
-      <div class="tb-title" id="tbTitle">Dashboard</div>
+      <div class="tb-title" id="tb-title">Dashboard</div>
       <div class="tb-r">
-        <span class="tb-time" id="tbTime"></span>
+        <span class="tb-time" id="tb-time"></span>
         <div class="tb-dot"></div>
       </div>
     </div>
@@ -326,27 +1268,72 @@ tr:hover td{background:rgba(82,130,255,.03)}
       <!-- DASHBOARD -->
       <div class="page active" id="page-dashboard">
         <div class="dash-stats">
-          <div class="dstat s1"><div class="ds-lbl">Total Projects</div><div class="ds-val s1" id="st-proj">0</div><div class="ds-sub">In Portfolio</div></div>
+          <div class="dstat s1"><div class="ds-lbl">Total Projects</div><div class="ds-val s1" id="st-proj">0</div><div class="ds-sub">In Database</div></div>
           <div class="dstat s2"><div class="ds-lbl">Total Messages</div><div class="ds-val s2" id="st-msg">0</div><div class="ds-sub">From Clients</div></div>
-          <div class="dstat s3"><div class="ds-lbl">Unread</div><div class="ds-val s3" id="st-unread">0</div><div class="ds-sub">Needs Attention</div></div>
-          <div class="dstat s4"><div class="ds-lbl">Replied</div><div class="ds-val s4" id="st-replied">0</div><div class="ds-sub">Via Gmail</div></div>
+          <div class="dstat s3"><div class="ds-lbl">Unread Messages</div><div class="ds-val s3" id="st-unread">0</div><div class="ds-sub">Needs Attention</div></div>
+        </div>
+        <div class="dash-stats-row2">
+          <div class="dstat s4"><div class="ds-lbl">Replied Messages</div><div class="ds-val s4" id="st-replied">0</div><div class="ds-sub">Via Gmail</div></div>
+          <div class="dstat s5"><div class="ds-lbl">Completed Projects</div><div class="ds-val s5" id="st-complete">0</div><div class="ds-sub">100% Done</div></div>
+          <div class="dstat s6"><div class="ds-lbl">In Progress</div><div class="ds-val s6" id="st-progress">0</div><div class="ds-sub">Active Projects</div></div>
         </div>
         <div class="dash-panels">
           <div class="dpanel">
-            <div class="dp-head"><div class="dp-title">Recent Messages</div><span class="dp-link" onclick="goto('messages')">View All →</span></div>
-            <div id="d-msgs"></div>
+            <div class="dp-head"><div class="dp-title">Recent Messages</div><span class="dp-link" onclick="gotoPage('messages')">View All →</span></div>
+            <div id="d-msgs"><div class="empty" style="padding:20px"><div class="empty-ico">📭</div><div class="empty-txt">Loading...</div></div></div>
           </div>
           <div class="dpanel">
-            <div class="dp-head"><div class="dp-title">Recent Projects</div><span class="dp-link" onclick="goto('projects')">View All →</span></div>
-            <div id="d-projs"></div>
+            <div class="dp-head"><div class="dp-title">Recent Projects</div><span class="dp-link" onclick="gotoPage('project_view')">View All →</span></div>
+            <div id="d-projs"><div class="empty" style="padding:20px"><div class="empty-ico">📁</div><div class="empty-txt">Loading...</div></div></div>
           </div>
         </div>
       </div>
 
-      <!-- PROJECTS -->
+      <!-- PROJECTS OVERVIEW -->
+      <div class="page" id="page-project_view">
+        <div class="ph">
+          <div class="ph-title">Projects <em>Overview</em></div>
+          <button class="btn btn-primary" onclick="openProjModal()">
+            <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"/></svg>
+            Add Project
+          </button>
+        </div>
+        <div class="pv-tabs">
+          <div class="pv-tab on" onclick="switchPvTab('completed',this)">
+            ✅ Completed
+            <span class="pv-count" id="ps-count-c">0</span>
+          </div>
+          <div class="pv-tab" onclick="switchPvTab('inprogress',this)">
+            ⟳ In Progress
+            <span class="pv-count" id="ps-count-i">0</span>
+          </div>
+          <div class="pv-tab" onclick="switchPvTab('updatesoon',this)">
+            🔄 Update Soon
+            <span class="pv-count" id="ps-count-us">0</span>
+          </div>
+          <div class="pv-tab" onclick="switchPvTab('off',this)">
+            🚫 Hidden (Off)
+            <span class="pv-count" id="ps-count-off">0</span>
+          </div>
+        </div>
+        <div class="pv-panel on" id="pv-completed">
+          <div class="proj-cards-grid" id="ps-completed"></div>
+        </div>
+        <div class="pv-panel" id="pv-inprogress">
+          <div class="proj-cards-grid" id="ps-inprogress"></div>
+        </div>
+        <div class="pv-panel" id="pv-updatesoon">
+          <div class="proj-cards-grid" id="ps-updatesoon"></div>
+        </div>
+        <div class="pv-panel" id="pv-off">
+          <div class="proj-cards-grid" id="ps-off"></div>
+        </div>
+      </div>
+
+      <!-- MANAGE PROJECTS TABLE -->
       <div class="page" id="page-projects">
         <div class="ph">
-          <div class="ph-title">All <em>Projects</em></div>
+          <div class="ph-title">Manage <em>Projects</em></div>
           <button class="btn btn-primary" onclick="openProjModal()">
             <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"/></svg>
             Add Project
@@ -364,33 +1351,31 @@ tr:hover td{background:rgba(82,130,255,.03)}
         </div>
         <div class="tbl">
           <table>
-            <thead><tr><th>Project</th><th>Category</th><th>Tech Stack</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+            <thead><tr>
+              <th>Project</th><th>Category</th><th>Progress</th>
+              <th>Status</th><th>Created</th><th>Updated</th><th>Actions</th>
+            </tr></thead>
             <tbody id="proj-tbody"></tbody>
           </table>
         </div>
-        <div id="proj-empty" style="display:none" class="empty"><div class="empty-ico">📁</div><div class="empty-txt">No projects found. Click "Add Project" to get started.</div></div>
+        <div id="proj-empty" style="display:none" class="empty"><div class="empty-ico">📁</div><div class="empty-txt">No projects yet</div></div>
       </div>
 
       <!-- MESSAGES -->
       <div class="page" id="page-messages">
         <div class="ph">
           <div class="ph-title">Client <em>Messages</em></div>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-ghost btn-sm" onclick="markAllRead()">Mark All Read</button>
-          </div>
+          <button class="btn btn-ghost btn-sm" onclick="markAllRead()">✓ Mark All Read</button>
         </div>
-
-        <!-- GMAIL INFO BANNER -->
-        <div style="background:rgba(234,67,53,0.07);border:1px solid rgba(234,67,53,0.25);padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;gap:12px">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="#ea4335"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 010 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg>
+        <div style="background:rgba(234,67,53,.07);border:1px solid rgba(234,67,53,.25);padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#ea4335"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 010 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg>
           <div>
-            <div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:.9rem;color:#ea4335">Gmail Reply System</div>
-            <div style="font-size:.78rem;color:var(--txt3);margin-top:2px">Click <strong style="color:var(--txt2)">Reply via Gmail</strong> on any message — your Gmail will open with the reply pre-filled. Just hit Send! ✉️</div>
+            <div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:.88rem;color:#ea4335">Gmail Reply System — Real-time Database</div>
+            <div style="font-size:.76rem;color:var(--txt3);margin-top:2px">All messages sync in real-time across all admins. Click <strong style="color:var(--txt2)">Reply via Gmail</strong> to send directly.</div>
           </div>
         </div>
-
         <div class="fbar">
-          <input class="fsearch" type="text" placeholder="Search by name or email..." oninput="renderMessages(this.value)">
+          <input class="fsearch" type="text" placeholder="Search name, email, message..." oninput="renderMessages(this.value)">
           <select class="fsel" id="mFilter" onchange="renderMessages()">
             <option value="">All Messages</option>
             <option value="unread">Unread Only</option>
@@ -399,43 +1384,151 @@ tr:hover td{background:rgba(82,130,255,.03)}
           </select>
         </div>
         <div class="msg-list" id="msg-list"></div>
-        <div id="msg-empty" style="display:none" class="empty"><div class="empty-ico">📭</div><div class="empty-txt">No messages yet. Client form submissions will appear here.</div></div>
+        <div id="msg-empty" style="display:none" class="empty"><div class="empty-ico">📭</div><div class="empty-txt">No messages found. Client form submissions appear here in real-time.</div></div>
+      </div>
+
+      <!-- ADMIN MANAGEMENT (main admin only) -->
+      <div class="page" id="page-admins">
+        <div class="ph">
+          <div class="ph-title">Admin <em>Management</em></div>
+          <div style="display:flex;gap:8px">
+            <span class="badge b-gold" style="font-size:.65rem;padding:6px 12px">Pending: <span id="adm-pending-count">0</span></span>
+            <span class="badge b-mint" style="font-size:.65rem;padding:6px 12px">Approved: <span id="adm-approved-count">0</span></span>
+          </div>
+        </div>
+        <div style="background:rgba(245,200,66,.07);border:1px solid rgba(245,200,66,.25);padding:12px 16px;margin-bottom:16px;font-size:.82rem;color:var(--txt2)">
+          ★ As <strong style="color:var(--gold)">Main Admin</strong>, you control who can access this admin panel. Approve or reject admin requests. Approved admins can view all messages and projects. When you approve, Gmail will open to notify them automatically.
+        </div>
+        <div id="adm-list"></div>
+      </div>
+
+      <!-- SERVICES STATUS -->
+      <div class="page" id="page-services">
+        <div class="ph">
+          <div class="ph-title">Services <em>Status</em></div>
+          <button class="btn btn-ghost btn-sm" onclick="resetAllServices()">↺ Reset All to Available</button>
+        </div>
+        <div style="background:rgba(82,130,255,.07);border:1px solid rgba(82,130,255,.2);padding:14px 18px;margin-bottom:22px;display:flex;align-items:center;gap:12px;font-size:.84rem;color:var(--txt2)">
+          <span style="font-size:1.4rem">⚡</span>
+          <div>Changes apply to the <strong style="color:var(--txt)">live website instantly</strong> in real-time — no refresh needed. Visitors will see updated badges immediately.</div>
+        </div>
+
+        <div class="svc-status-grid" id="svc-status-grid">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+
+      <!-- YOUTUBE SECTION MANAGER -->
+      <div class="page" id="page-youtube">
+        <div class="ph">
+          <div class="ph-title">YouTube <em>Section</em></div>
+          <span class="badge b-red" style="font-size:.65rem;padding:8px 14px">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="#f87171"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg>
+            Live on Website
+          </span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1.1fr 1fr;gap:20px;align-items:start">
+
+          <!-- VIDEO SETTINGS -->
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <div class="sp">
+              <div class="sp-title">Featured Video</div>
+              <div class="fg">
+                <label class="fl">YouTube Video URL or Embed URL</label>
+                <input class="fi" id="yt-url" type="text" placeholder="https://www.youtube.com/watch?v=VIDEO_ID  or  https://www.youtube.com/embed/VIDEO_ID">
+                <div style="font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--txt3);margin-top:4px;line-height:1.7">
+                  Paste full YouTube URL (watch or embed) — auto-converts to embed.<br>
+                  Example: <span style="color:var(--blue2)">https://www.youtube.com/watch?v=dQw4w9WgXcQ</span>
+                </div>
+              </div>
+              <div class="fg">
+                <label class="fl">Video Title (shown on website)</label>
+                <input class="fi" id="yt-title" type="text" placeholder="Our Latest Work — Feature Designz">
+              </div>
+              <div class="fg">
+                <label class="fl">Video Description (optional)</label>
+                <textarea class="fta" id="yt-desc" placeholder="Short description shown below the video..."></textarea>
+              </div>
+              <button class="btn btn-primary" onclick="saveYoutubeSettings()" style="width:100%;justify-content:center">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg>
+                Save & Update Live Website
+              </button>
+            </div>
+
+            <!-- CHANNEL SETTINGS -->
+            <div class="sp">
+              <div class="sp-title">Channel Settings</div>
+              <div class="fg">
+                <label class="fl">Channel URL</label>
+                <input class="fi" id="yt-channel" type="text" placeholder="https://www.youtube.com/channel/UCda2mc_f-nIinjWpDUJiA2g">
+              </div>
+              <div class="fg">
+                <label class="fl">Subscribe Button Text</label>
+                <input class="fi" id="yt-btn-txt" type="text" placeholder="Subscribe Now">
+              </div>
+              <div class="fg">
+                <label class="fl">Section Heading</label>
+                <input class="fi" id="yt-heading" type="text" placeholder="Tutorials, Tips &amp; Behind the Scenes">
+              </div>
+              <button class="btn btn-ghost" onclick="saveYoutubeSettings()" style="width:100%;justify-content:center">Save Channel Settings</button>
+            </div>
+          </div>
+
+          <!-- LIVE PREVIEW -->
+          <div class="sp" style="position:sticky;top:24px">
+            <div class="sp-title">Live Preview</div>
+            <div id="yt-preview-wrap" style="background:var(--bg3);border:1px solid var(--bdr);overflow:hidden">
+              <div style="aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;background:var(--bg3)" id="yt-preview-frame">
+                <div style="text-align:center;color:var(--txt3)">
+                  <div style="font-size:2.5rem;margin-bottom:8px">▶</div>
+                  <div style="font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.1em">Video Preview</div>
+                </div>
+              </div>
+            </div>
+            <div style="margin-top:12px">
+              <div id="yt-preview-title" style="font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:1rem;margin-bottom:6px;color:var(--txt)">—</div>
+              <div id="yt-preview-desc" style="font-size:.8rem;color:var(--txt3);line-height:1.65"></div>
+            </div>
+            <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--bdr)">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3);margin-bottom:8px">Current Embed URL</div>
+              <div id="yt-current-url" style="font-family:'JetBrains Mono',monospace;font-size:.64rem;color:var(--blue2);word-break:break-all;line-height:1.6">Loading from Firebase...</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- SETTINGS -->
       <div class="page" id="page-settings">
         <div class="ph"><div class="ph-title">Admin <em>Settings</em></div></div>
-        <div class="settings-grid">
+        <div class="sg">
           <div class="sp">
             <div class="sp-title">Change Password</div>
-            <div class="fg"><label class="fl">Current Password</label><input class="fi" type="password" id="cp-old" placeholder="Current password"></div>
-            <div class="fg"><label class="fl">New Password</label><input class="fi" type="password" id="cp-new" placeholder="Min 6 characters"></div>
-            <div class="fg"><label class="fl">Confirm New</label><input class="fi" type="password" id="cp-cfm" placeholder="Confirm password"></div>
-            <button class="btn btn-primary" onclick="changePw()">Update Password</button>
+            <div class="fg"><label class="fl">New Password</label><input class="fi" type="password" id="cp-new" placeholder="New Firebase password"></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--txt3);margin-bottom:14px;line-height:1.7">Use "Forgot Password" on login page to reset via Gmail, or enter new password here (Firebase auth).</div>
+            <a href="https://console.firebase.google.com" target="_blank" class="btn btn-ghost">Open Firebase Console →</a>
           </div>
           <div class="sp">
-            <div class="sp-title">Gmail Settings</div>
-            <div class="fg"><label class="fl">Your Gmail Address</label><input class="fi" type="email" id="set-gmail" placeholder="infofeaturedesignz@gmail.com" value="infofeaturedesignz@gmail.com"></div>
-            <div class="fg"><label class="fl">Default Subject Prefix</label><input class="fi" type="text" id="set-subj" placeholder="Re: Feature Designz Inquiry" value="Re: Your Feature Designz Inquiry"></div>
-            <button class="btn btn-primary" onclick="saveGmailSettings()">Save Settings</button>
+            <div class="sp-title">Gmail Reply Settings</div>
+            <div class="fg"><label class="fl">Studio Gmail Address</label><input class="fi" type="email" id="set-gmail" value="infofeaturedesignz@gmail.com"></div>
+            <div class="fg"><label class="fl">Default Subject Prefix</label><input class="fi" type="text" id="set-subj" value="Re: Your Feature Designz Inquiry"></div>
+            <button class="btn btn-primary" onclick="saveGmailSettings()">Save Gmail Settings</button>
           </div>
           <div class="sp">
-            <div class="sp-title">Data Management</div>
-            <div style="display:flex;flex-direction:column;gap:10px">
-              <button class="btn btn-ghost" onclick="exportData()">📤 Export All Data (JSON)</button>
-              <button class="btn btn-ghost" onclick="document.getElementById('importF').click()">📥 Import Data (JSON)</button>
-              <input type="file" id="importF" accept=".json" style="display:none" onchange="importData(this)">
-              <button class="btn btn-danger" onclick="clearAll()">🗑️ Clear All Data</button>
+            <div class="sp-title">Session Info</div>
+            <div style="display:flex;flex-direction:column;gap:10px;font-size:.84rem;color:var(--txt3)">
+              <div style="display:flex;justify-content:space-between"><span>Auto-logout after</span><span style="color:var(--txt);font-family:'JetBrains Mono',monospace">3 days</span></div>
+              <div style="display:flex;justify-content:space-between"><span>Logged in as</span><span id="qs-email" style="color:var(--blue);font-size:.74rem;font-family:'JetBrains Mono',monospace">—</span></div>
+              <div style="display:flex;justify-content:space-between"><span>Role</span><span id="qs-role" style="color:var(--gold)">—</span></div>
             </div>
           </div>
           <div class="sp">
-            <div class="sp-title">Quick Stats</div>
-            <div style="display:flex;flex-direction:column;gap:11px;font-size:.85rem;color:var(--txt3)">
-              <div style="display:flex;justify-content:space-between"><span>Total Projects</span><span id="qs-p" style="color:var(--txt)">0</span></div>
-              <div style="display:flex;justify-content:space-between"><span>Total Messages</span><span id="qs-m" style="color:var(--txt)">0</span></div>
-              <div style="display:flex;justify-content:space-between"><span>Unread</span><span id="qs-u" style="color:var(--blue)">0</span></div>
-              <div style="display:flex;justify-content:space-between"><span>Replied via Gmail</span><span id="qs-r" style="color:var(--mint)">0</span></div>
-              <div style="display:flex;justify-content:space-between"><span>Gmail Address</span><span id="qs-g" style="color:var(--txt);font-size:.75rem">-</span></div>
+            <div class="sp-title">Firebase Config Check</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--txt3);line-height:1.8">
+              <div>✅ Firebase Auth: <span style="color:var(--mint)">Connected</span></div>
+              <div>✅ Firestore DB: <span style="color:var(--mint)">Connected</span></div>
+              <div>✅ Real-time Sync: <span style="color:var(--mint)">Active</span></div>
+              <div style="margin-top:10px;color:var(--txt3)">Messages & projects are<br>synced across all admins.</div>
             </div>
           </div>
         </div>
@@ -453,15 +1546,44 @@ tr:hover td{background:rgba(82,130,255,.03)}
       <input type="hidden" id="pe-id">
       <div class="fr">
         <div class="fg"><label class="fl">Project Name *</label><input class="fi" id="pe-name" type="text" placeholder="E-Commerce Platform"></div>
-        <div class="fg"><label class="fl">Category *</label><select class="fsel2" id="pe-cat"><option value="">Select...</option><option value="web">Web Development</option><option value="mobile">Mobile App</option><option value="design">Graphics Design</option><option value="video">Video Editing</option></select></div>
+        <div class="fg"><label class="fl">Category *</label>
+          <select class="fsel2" id="pe-cat">
+            <option value="">Select...</option>
+            <option value="web">Web Development</option>
+            <option value="mobile">Mobile App</option>
+            <option value="design">Graphics Design</option>
+            <option value="video">Video Editing</option>
+          </select>
+        </div>
       </div>
-      <div class="fg"><label class="fl">Description *</label><textarea class="fta" id="pe-desc" placeholder="Short description..."></textarea></div>
-      <div class="fg"><label class="fl">Tech Stack / Tools (comma separated)</label><input class="fi" id="pe-tags" type="text" placeholder="React, Node.js, MongoDB"></div>
+      <div class="fg"><label class="fl">Description *</label><textarea class="fta" id="pe-desc" placeholder="Short description of the project..."></textarea></div>
       <div class="fr">
-        <div class="fg"><label class="fl">Project URL (optional)</label><input class="fi" id="pe-url" type="url" placeholder="https://..."></div>
+        <div class="fg"><label class="fl">Client Name</label><input class="fi" id="pe-client" type="text" placeholder="Client / Company name"></div>
         <div class="fg"><label class="fl">Emoji Icon</label><input class="fi" id="pe-emoji" type="text" placeholder="🚀" maxlength="4"></div>
       </div>
-      <div class="fg"><label class="fl">Status</label><select class="fsel2" id="pe-status"><option value="completed">✓ Completed</option><option value="inprogress">⟳ In Progress</option><option value="paused">⏸ Paused</option></select></div>
+      <div class="fg"><label class="fl">Tech Stack / Tools (comma separated)</label><input class="fi" id="pe-tags" type="text" placeholder="React, Node.js, MongoDB"></div>
+      <div class="fg"><label class="fl">Project URL (optional)</label><input class="fi" id="pe-url" type="url" placeholder="https://..."></div>
+
+      <!-- PROGRESS SLIDER -->
+      <div class="fg">
+        <label class="fl">Completion Progress</label>
+        <div class="prog-display" id="pe-prog-val">0%</div>
+        <input type="range" class="progress-slider" id="pe-progress" min="0" max="100" step="5" value="0" oninput="updateProgress(this.value)">
+        <div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--txt3);margin-top:3px">
+          <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+        </div>
+      </div>
+
+      <div class="fg"><label class="fl">Status</label>
+        <select class="fsel2" id="pe-status">
+          <option value="inprogress">⟳ In Progress</option>
+          <option value="completed">✓ Completed</option>
+          <option value="update_soon">🔄 Update Soon</option>
+          <option value="paused">⏸ Paused</option>
+          <option value="off">🚫 Off (Hidden)</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Internal Notes</label><textarea class="fta" id="pe-notes" placeholder="Private notes about this project..."></textarea></div>
     </div>
     <div class="mf">
       <button class="btn btn-ghost" onclick="closeM('projModal')">Cancel</button>
@@ -470,50 +1592,41 @@ tr:hover td{background:rgba(82,130,255,.03)}
   </div>
 </div>
 
-<!-- GMAIL REPLY MODAL -->
+<!-- GMAIL MODAL -->
 <div class="modal-bg" id="gmailModal">
   <div class="modal">
     <div class="mh">
-      <div class="mh-title" style="display:flex;align-items:center;gap:10px">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="#ea4335"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 010 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg>
+      <div class="mh-title" style="display:flex;align-items:center;gap:9px">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#ea4335"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 010 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg>
         Reply via Gmail
       </div>
       <button class="mc-x" onclick="closeM('gmailModal')">✕</button>
     </div>
     <div class="mb">
-      <!-- Gmail compose preview -->
       <div class="gmail-compose">
-        <div class="gc-header">
-          <div class="gc-gmail-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="#ea4335"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 010 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg>
-          </div>
-          <div class="gc-title">Gmail — New Message Preview</div>
+        <div class="gc-head">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="#ea4335"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 010 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg>
+          <div class="gc-title">Gmail Compose Preview</div>
         </div>
-        <div class="gc-field"><span class="gc-lbl">To:</span><span class="gc-val editable" id="gm-to">—</span></div>
-        <div class="gc-field"><span class="gc-lbl">Subject:</span><span class="gc-val editable" id="gm-subj">—</span></div>
-        <div class="gc-note">Your Gmail app will open with this message pre-filled. Review and click Send in Gmail.</div>
+        <div class="gc-field"><span class="gc-lbl">To:</span><span class="gc-val" id="gm-to">—</span></div>
+        <div class="gc-field"><span class="gc-lbl">Subject:</span><span class="gc-val" id="gm-subj">—</span></div>
+        <div class="gc-note">Gmail will open pre-filled. Click Send in Gmail to deliver the email.</div>
       </div>
-
-      <!-- Original message -->
       <div style="background:var(--bg3);border:1px solid var(--bdr);padding:14px;margin-bottom:14px">
-        <div style="font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3);margin-bottom:6px">Original Message from <span id="gm-from" style="color:var(--blue2)"></span></div>
-        <div id="gm-orig" style="font-size:.84rem;color:var(--txt2);line-height:1.7"></div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:.54rem;letter-spacing:.14em;text-transform:uppercase;color:var(--txt3);margin-bottom:6px">Original from <span id="gm-from" style="color:var(--blue2)"></span></div>
+        <div id="gm-orig" style="font-size:.83rem;color:var(--txt2);line-height:1.7"></div>
       </div>
-
-      <!-- Reply textarea -->
-      <div class="fg">
-        <label class="fl">Your Reply Message</label>
-        <textarea class="fta" id="gm-reply" style="min-height:140px" placeholder="Type your reply here...&#10;&#10;Best regards,&#10;Feature Designz Team"></textarea>
+      <div class="fg"><label class="fl">Your Reply</label>
+        <textarea class="fta" id="gm-reply" style="min-height:150px" placeholder="Type your reply..."></textarea>
       </div>
-      <input type="hidden" id="gm-id">
     </div>
     <div class="mf" style="justify-content:space-between;align-items:center">
-      <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--txt3)">Gmail will open in a new tab</div>
-      <div style="display:flex;gap:10px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--txt3)">Opens Gmail in new tab</div>
+      <div style="display:flex;gap:8px">
         <button class="btn btn-ghost" onclick="closeM('gmailModal')">Cancel</button>
         <button class="btn btn-gmail" onclick="sendViaGmail()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 010 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg>
-          Open in Gmail & Mark Replied
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 010 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg>
+          Open Gmail & Save Reply
         </button>
       </div>
     </div>
@@ -524,7 +1637,7 @@ tr:hover td{background:rgba(82,130,255,.03)}
 <div class="cfm-bg" id="cfmDlg">
   <div class="cfm">
     <h3 id="cfm-title">Are you sure?</h3>
-    <p id="cfm-msg">This action cannot be undone.</p>
+    <p id="cfm-msg">This cannot be undone.</p>
     <div class="cfm-btns">
       <button class="btn btn-ghost" onclick="closeCfm()">Cancel</button>
       <button class="btn btn-danger" id="cfm-ok">Confirm</button>
@@ -533,367 +1646,241 @@ tr:hover td{background:rgba(82,130,255,.03)}
 </div>
 
 <!-- TOAST -->
-<div id="toast"><span id="t-ico">✓</span><span id="t-msg">Done!</span></div>
+<div id="toast"><span id="t-ico">✓</span><span id="t-msg"></span></div>
 
-<script>
-/* ══ AUTH ══ */
-const DEF = {u:'admin',p:'featuredesignz2025'};
-const getCreds = () => JSON.parse(localStorage.getItem('fd_creds')||JSON.stringify(DEF));
-const getGmailCfg = () => JSON.parse(localStorage.getItem('fd_gmail')||JSON.stringify({email:'infofeaturedesignz@gmail.com',subj:'Re: Your Feature Designz Inquiry'}));
-
-function doLogin(){
-  const u=document.getElementById('lu').value.trim();
-  const p=document.getElementById('lp').value;
-  const c=getCreds();
-  if(u===c.u&&p===c.p){
-    localStorage.setItem('fd_sess','1');
-    document.getElementById('loginScreen').style.display='none';
-    document.getElementById('app').style.display='flex';
-    init();
-  } else {
-    const e=document.getElementById('lerr');e.style.display='block';
-    setTimeout(()=>e.style.display='none',3000);
-  }
-}
-document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('loginScreen').style.display!=='none')doLogin()});
-function doLogout(){localStorage.removeItem('fd_sess');location.reload()}
-
-function changePw(){
-  const o=document.getElementById('cp-old').value;
-  const n=document.getElementById('cp-new').value;
-  const c=document.getElementById('cp-cfm').value;
-  const cr=getCreds();
-  if(o!==cr.p){toast('Current password is incorrect','error');return}
-  if(n.length<6){toast('New password must be 6+ characters','error');return}
-  if(n!==c){toast('Passwords do not match','error');return}
-  cr.p=n;localStorage.setItem('fd_creds',JSON.stringify(cr));
-  ['cp-old','cp-new','cp-cfm'].forEach(id=>document.getElementById(id).value='');
-  toast('Password updated!','success');
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+// Tab switcher for project view
+function switchPvTab(id, el) {
+  document.querySelectorAll('.pv-tab').forEach(t => t.classList.remove('on'));
+  document.querySelectorAll('.pv-panel').forEach(p => p.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('pv-' + id).classList.add('on');
 }
 
-function saveGmailSettings(){
-  const email=document.getElementById('set-gmail').value.trim();
-  const subj=document.getElementById('set-subj').value.trim();
-  if(!email){toast('Please enter Gmail address','error');return}
-  localStorage.setItem('fd_gmail',JSON.stringify({email,subj}));
-  updateSettingsView();
-  toast('Gmail settings saved!','success');
+/* ══════════════════════════════════════
+   SERVICES STATUS MANAGEMENT
+══════════════════════════════════════ */
+const SERVICES_DEF = [
+  { id:'web',    icon:'💻', name:'Full Stack Web Development', desc:'Websites, web apps, e-commerce, dashboards — React, Next.js, Laravel, Node.js.' },
+  { id:'mobile', icon:'📱', name:'App Development',           desc:'iOS & Android apps — Flutter, React Native, Firebase.' },
+  { id:'design', icon:'🎨', name:'Branding & Graphic Design', desc:'Logos, brand identity, social media kits, print materials.' },
+  { id:'video',  icon:'🎬', name:'Video Editing & Motion',    desc:'YouTube videos, reels, motion graphics, color grading.' }
+];
+
+const STATUS_INFO = {
+  available:   { label:'Now Available',  cls:'active-avail', badge:'● Now Available',  color:'var(--mint)' },
+  coming_soon: { label:'Coming Soon',    cls:'active-soon',  badge:'◎ Coming Soon',    color:'var(--gold)' },
+  off:         { label:'Off',            cls:'active-off',   badge:'○ Not Available',  color:'var(--txt3)' }
+};
+
+let servicesCache = {};
+let unsubServices = null;
+
+function subscribeServices() {
+  const { onSnapshot, doc, collection } = window.__fbModules;
+  SERVICES_DEF.forEach(svc => {
+    onSnapshot(doc(db, 'services', svc.id), snap => {
+      const status = snap.exists() ? (snap.data().status || 'available') : 'available';
+      servicesCache[svc.id] = status;
+      renderSvcCard(svc.id);
+    });
+  });
 }
 
-/* ══ INIT ══ */
-function init(){
-  setInterval(()=>{
-    const n=new Date();
-    document.getElementById('tbTime').textContent=n.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true});
-  },1000);
-  document.getElementById('tbTime').textContent=new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true});
-  renderDash();renderProjects();renderMessages();updateBadge();
-  // load gmail settings into fields
-  const g=getGmailCfg();
-  document.getElementById('set-gmail').value=g.email;
-  document.getElementById('set-subj').value=g.subj;
-}
-
-/* ══ NAV ══ */
-const TITLES={dashboard:'Dashboard',projects:'Projects',messages:'Messages',settings:'Settings'};
-function goto(id){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.sb-it').forEach(i=>i.classList.remove('on'));
-  document.getElementById('page-'+id).classList.add('active');
-  document.querySelectorAll('.sb-it').forEach(i=>{if(i.getAttribute('onclick')?.includes("'"+id+"'"))i.classList.add('on')});
-  document.getElementById('tbTitle').textContent=TITLES[id]||id;
-  if(id==='dashboard')renderDash();
-  if(id==='messages')renderMessages();
-  if(id==='projects')renderProjects();
-  if(id==='settings')updateSettingsView();
-}
-
-/* ══ DATA ══ */
-const getP=()=>JSON.parse(localStorage.getItem('fd_projects')||'[]');
-const setP=d=>localStorage.setItem('fd_projects',JSON.stringify(d));
-const getM=()=>JSON.parse(localStorage.getItem('fd_messages')||'[]');
-const setM=d=>localStorage.setItem('fd_messages',JSON.stringify(d));
-const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-const fmtD=iso=>{if(!iso)return'';const d=new Date(iso);return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})};
-const fmtDT=iso=>{if(!iso)return'';const d=new Date(iso);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' · '+d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})};
-const catL={web:'Web Dev',mobile:'Mobile App',design:'Graphics Design',video:'Video Editing'};
-const catB={web:'b-blue',mobile:'b-cyan',design:'b-gold',video:'b-pink'};
-const stB={completed:'<span class="badge b-green">✓ Completed</span>',inprogress:'<span class="badge b-blue">⟳ In Progress</span>',paused:'<span class="badge b-grey">⏸ Paused</span>'};
-
-/* ══ DASHBOARD ══ */
-function renderDash(){
-  const p=getP(),m=getM();
-  const ur=m.filter(x=>!x.read).length,rp=m.filter(x=>x.replied).length;
-  document.getElementById('st-proj').textContent=p.length;
-  document.getElementById('st-msg').textContent=m.length;
-  document.getElementById('st-unread').textContent=ur;
-  document.getElementById('st-replied').textContent=rp;
-
-  const dm=document.getElementById('d-msgs');
-  dm.innerHTML=!m.length?'<div class="empty"><div class="empty-ico">📭</div><div class="empty-txt">No messages yet</div></div>':
-    m.slice(0,4).map(x=>`<div style="padding:9px 0;border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center">
-      <div><div style="font-weight:600;font-size:.86rem">${esc(x.name)}</div><div style="font-size:.73rem;color:var(--txt3)">${esc(x.email)}</div></div>
-      <div style="display:flex;gap:5px;align-items:center">
-        ${!x.read?'<span class="badge b-blue">New</span>':''}
-        ${x.replied?'<span class="badge b-mint">Replied</span>':''}
-        <span style="font-family:JetBrains Mono,monospace;font-size:.58rem;color:var(--txt3)">${fmtD(x.date)}</span>
-      </div></div>`).join('');
-
-  const dp=document.getElementById('d-projs');
-  dp.innerHTML=!p.length?'<div class="empty"><div class="empty-ico">📁</div><div class="empty-txt">No projects yet</div></div>':
-    [...p].reverse().slice(0,4).map(x=>`<div style="padding:9px 0;border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center">
-      <div style="display:flex;align-items:center;gap:9px">
-        <span style="font-size:1.2rem">${x.emoji||'📁'}</span>
-        <div><div style="font-weight:600;font-size:.86rem">${esc(x.name)}</div><div style="font-size:.73rem;color:var(--txt3)">${catL[x.cat]||x.cat}</div></div>
-      </div>${stB[x.status]||''}</div>`).join('');
-}
-
-/* ══ PROJECTS ══ */
-let pCatF='',pEditId=null;
-function renderProjects(q='',catF=''){
-  if(catF!=='')pCatF=catF;
-  let p=getP();
-  const sq=(q||document.querySelector('#page-projects .fsearch')?.value||'').toLowerCase();
-  if(sq)p=p.filter(x=>x.name.toLowerCase().includes(sq)||x.desc.toLowerCase().includes(sq));
-  if(pCatF)p=p.filter(x=>x.cat===pCatF);
-  const tb=document.getElementById('proj-tbody'),em=document.getElementById('proj-empty');
-  if(!p.length){tb.innerHTML='';em.style.display='block';return}
-  em.style.display='none';
-  tb.innerHTML=[...p].reverse().map(x=>`<tr>
-    <td><div style="display:flex;align-items:center;gap:9px"><span style="font-size:1.2rem">${x.emoji||'📁'}</span><div><div style="font-weight:600">${esc(x.name)}</div><div style="font-size:.73rem;color:var(--txt3);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.desc)}</div></div></div></td>
-    <td><span class="badge ${catB[x.cat]||'b-grey'}">${catL[x.cat]||x.cat}</span></td>
-    <td><div style="display:flex;flex-wrap:wrap;gap:4px">${(x.tags||[]).slice(0,3).map(t=>`<span style="font-family:JetBrains Mono,monospace;font-size:.54rem;letter-spacing:.08em;text-transform:uppercase;padding:3px 7px;background:var(--bg3);color:var(--txt3)">${esc(t)}</span>`).join('')}${(x.tags||[]).length>3?`<span style="font-size:.7rem;color:var(--txt3)">+${x.tags.length-3}</span>`:''}</div></td>
-    <td>${stB[x.status]||''}</td>
-    <td style="font-family:JetBrains Mono,monospace;font-size:.62rem;color:var(--txt3)">${fmtD(x.date)}</td>
-    <td><div style="display:flex;gap:5px">
-      ${x.url?`<a href="${esc(x.url)}" target="_blank" class="btn btn-ghost btn-sm">🔗</a>`:''}
-      <button class="btn btn-ghost btn-sm" onclick="editProj('${x.id}')">✏️</button>
-      <button class="btn btn-danger btn-sm" onclick="cfm('Delete Project','Delete this project permanently?',()=>delProj('${x.id}'))">🗑️</button>
-    </div></td></tr>`).join('');
-}
-
-function openProjModal(id=null){
-  pEditId=id;
-  document.getElementById('pm-title').textContent=id?'Edit Project':'Add New Project';
-  ['pe-name','pe-desc','pe-tags','pe-url','pe-emoji'].forEach(i=>document.getElementById(i).value='');
-  document.getElementById('pe-cat').value='';
-  document.getElementById('pe-status').value='completed';
-  document.getElementById('pe-id').value='';
-  if(id){
-    const x=getP().find(p=>p.id===id);
-    if(x){
-      document.getElementById('pe-name').value=x.name;
-      document.getElementById('pe-cat').value=x.cat;
-      document.getElementById('pe-desc').value=x.desc;
-      document.getElementById('pe-tags').value=(x.tags||[]).join(', ');
-      document.getElementById('pe-url').value=x.url||'';
-      document.getElementById('pe-emoji').value=x.emoji||'';
-      document.getElementById('pe-status').value=x.status||'completed';
-    }
-  }
-  openM('projModal');
-}
-function editProj(id){openProjModal(id)}
-
-function saveProject(){
-  const name=document.getElementById('pe-name').value.trim();
-  const cat=document.getElementById('pe-cat').value;
-  const desc=document.getElementById('pe-desc').value.trim();
-  const tags=document.getElementById('pe-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
-  const url=document.getElementById('pe-url').value.trim();
-  const emoji=document.getElementById('pe-emoji').value.trim()||'📁';
-  const status=document.getElementById('pe-status').value;
-  if(!name||!cat||!desc){toast('Fill all required fields','error');return}
-  let p=getP();
-  if(pEditId){
-    const i=p.findIndex(x=>x.id===pEditId);
-    if(i>-1)p[i]={...p[i],name,cat,desc,tags,url,emoji,status};
-    toast('Project updated!','success');
-  }else{
-    p.push({id:'proj_'+Date.now(),name,cat,desc,tags,url,emoji,status,date:new Date().toISOString()});
-    toast('Project added!','success');
-  }
-  setP(p);closeM('projModal');renderProjects();renderDash();
-}
-
-function delProj(id){
-  setP(getP().filter(p=>p.id!==id));renderProjects();renderDash();toast('Project deleted','success');
-}
-
-/* ══ MESSAGES ══ */
-function renderMessages(q=''){
-  let m=getM();
-  const sq=(q||document.querySelector('#page-messages .fsearch')?.value||'').toLowerCase();
-  const flt=document.getElementById('mFilter')?.value||'';
-  if(sq)m=m.filter(x=>x.name.toLowerCase().includes(sq)||x.email.toLowerCase().includes(sq)||x.detail?.toLowerCase().includes(sq));
-  if(flt==='unread')m=m.filter(x=>!x.read);
-  if(flt==='replied')m=m.filter(x=>x.replied);
-  if(flt==='pending')m=m.filter(x=>!x.replied);
-  const list=document.getElementById('msg-list'),em=document.getElementById('msg-empty');
-  if(!m.length){list.innerHTML='';em.style.display='block';return}
-  em.style.display='none';
-  list.innerHTML=m.map(x=>`
-    <div class="mcard ${!x.read?'unread':''} ${x.replied?'replied':''}" id="mc-${x.id}">
-      <div class="mc-top">
-        <div>
-          <div class="mc-sender">${esc(x.name)}</div>
-          <div class="mc-email">${esc(x.email)}</div>
-        </div>
-        <div class="mc-meta">
-          <div class="mc-date">${fmtDT(x.date)}</div>
-          <div class="mc-badges">
-            ${!x.read?'<span class="badge b-blue">● Unread</span>':'<span class="badge b-grey">Read</span>'}
-            ${x.replied?'<span class="badge b-mint">✓ Gmail Replied</span>':'<span class="badge b-red">Not Replied</span>'}
-          </div>
-        </div>
+function renderServicePage() {
+  const grid = document.getElementById('svc-status-grid');
+  if (!grid) return;
+  grid.innerHTML = SERVICES_DEF.map(svc => `
+    <div class="svc-card-admin s-${svc.id}" id="sca-${svc.id}">
+      <div class="sca-icon">${svc.icon}</div>
+      <div class="sca-name">${svc.name}</div>
+      <div class="sca-desc">${svc.desc}</div>
+      <div class="sca-current">
+        <span class="sca-current-lbl">Current Status:</span>
+        <span id="sca-status-txt-${svc.id}" style="color:var(--mint)">Loading...</span>
       </div>
-      <div class="mc-service-budget">
-        ${x.service?`<span class="badge b-blue">📋 ${esc(x.service)}</span>`:''}
-        ${x.budget?`<span class="badge b-gold">💰 ${esc(x.budget)}</span>`:''}
-      </div>
-      <div class="mc-body">${esc(x.detail||'(No message)')}</div>
-      ${x.replied&&x.reply?`<div style="margin-top:10px;background:rgba(62,240,184,0.06);border:1px solid rgba(62,240,184,0.2);border-left:3px solid var(--mint);padding:12px 14px">
-        <div style="font-family:JetBrains Mono,monospace;font-size:.54rem;letter-spacing:.16em;text-transform:uppercase;color:var(--mint);margin-bottom:5px;display:flex;align-items:center;gap:5px">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="#ea4335"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 010 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg>
-          Sent via Gmail ${x.replyDate?'· '+fmtD(x.replyDate):''}
-        </div>
-        <div style="font-size:.83rem;color:var(--txt2);line-height:1.7;white-space:pre-line">${esc(x.reply)}</div>
-      </div>`:''}
-      <div class="mc-actions" style="margin-top:12px">
-        ${!x.read?`<button class="btn btn-ghost btn-sm" onclick="markRead('${x.id}')">✓ Mark Read</button>`:''}
-        <button class="btn btn-gmail btn-sm" onclick="openGmail('${x.id}')">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 010 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg>
-          ${x.replied?'Re-reply via Gmail':'Reply via Gmail'}
-        </button>
-        <button class="btn btn-danger btn-sm" onclick="cfm('Delete Message','Delete this message permanently?',()=>delMsg('${x.id}'))">🗑️</button>
+      <div class="status-toggle-row">
+        <button class="stog" id="stog-${svc.id}-available"   onclick="setServiceStatus('${svc.id}','available')">✅ Now Available</button>
+        <button class="stog" id="stog-${svc.id}-coming_soon" onclick="setServiceStatus('${svc.id}','coming_soon')">⏳ Coming Soon</button>
+        <button class="stog" id="stog-${svc.id}-off"         onclick="setServiceStatus('${svc.id}','off')">🚫 Off</button>
       </div>
     </div>`).join('');
+
+  // Apply cached statuses
+  SERVICES_DEF.forEach(svc => renderSvcCard(svc.id));
 }
 
-function markRead(id){
-  const m=getM();const x=m.find(i=>i.id===id);if(x)x.read=true;
-  setM(m);renderMessages();updateBadge();renderDash();toast('Marked as read','success');
-}
-function markAllRead(){
-  setM(getM().map(x=>({...x,read:true})));
-  renderMessages();updateBadge();renderDash();toast('All marked as read','success');
-}
-function delMsg(id){
-  setM(getM().filter(x=>x.id!==id));renderMessages();updateBadge();renderDash();toast('Message deleted','success');
-}
-function updateBadge(){
-  const n=getM().filter(x=>!x.read).length;
-  const b=document.getElementById('msgBadge');
-  if(n>0){b.textContent=n;b.style.display='flex'}else b.style.display='none';
-}
+function renderSvcCard(sid) {
+  const status = servicesCache[sid] || 'available';
+  const info   = STATUS_INFO[status];
 
-/* ══ GMAIL REPLY ══ */
-function openGmail(id){
-  const m=getM().find(x=>x.id===id);
-  if(!m)return;
-  const g=getGmailCfg();
-  const subjLine=g.subj+' — '+m.name;
-  document.getElementById('gm-to').textContent=m.email;
-  document.getElementById('gm-subj').textContent=subjLine;
-  document.getElementById('gm-from').textContent=m.name+' <'+m.email+'>';
-  document.getElementById('gm-orig').textContent=m.detail||'(No message)';
-  document.getElementById('gm-id').value=id;
-  // pre-fill reply with previous reply if exists
-  document.getElementById('gm-reply').value=m.reply||`Hi ${m.name},\n\nThank you for reaching out to Feature Designz!\n\n\n\nBest regards,\nFeature Designz Team\n📞 +94 786 675 150\n📧 infofeaturedesignz@gmail.com`;
-  // mark as read
-  const msgs=getM();const mx=msgs.find(x=>x.id===id);if(mx)mx.read=true;
-  setM(msgs);updateBadge();
-  openM('gmailModal');
+  // Update status text
+  const txt = document.getElementById('sca-status-txt-' + sid);
+  if (txt) { txt.textContent = info.badge; txt.style.color = info.color; }
+
+  // Update card dim
+  const card = document.getElementById('sca-' + sid);
+  if (card) card.classList.toggle('status-off', status === 'off');
+
+  // Update toggle buttons
+  ['available','coming_soon','off'].forEach(st => {
+    const btn = document.getElementById('stog-' + sid + '-' + st);
+    if (!btn) return;
+    btn.className = 'stog' + (st === status ? ' ' + STATUS_INFO[st].cls : '');
+  });
 }
 
-function sendViaGmail(){
-  const id=document.getElementById('gm-id').value;
-  const replyText=document.getElementById('gm-reply').value.trim();
-  if(!replyText){toast('Please write a reply first','error');return}
+window.setServiceStatus = async function(sid, status) {
+  try {
+    const { doc, setDoc, serverTimestamp } = window.__fbModules;
+    await setDoc(doc(db, 'services', sid), {
+      status,
+      updatedAt: serverTimestamp(),
+      updatedBy: currentUser?.email || 'admin'
+    });
+    servicesCache[sid] = status;
+    renderSvcCard(sid);
+    toast('Service status updated on live website! ⚡', 'success');
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+  }
+};
 
-  const m=getM().find(x=>x.id===id);
-  if(!m){toast('Message not found','error');return}
+window.resetAllServices = function() {
+  cfm('Reset All Services', 'Set all 4 services to "Now Available"?', async () => {
+    await Promise.all(SERVICES_DEF.map(svc => setServiceStatus(svc.id, 'available')));
+    toast('All services reset to Available ✓', 'success');
+  });
+};
 
-  const g=getGmailCfg();
-  const subjLine=g.subj+' — '+m.name;
+/* ══════════════════════════════════════
+   YOUTUBE SECTION MANAGEMENT
+══════════════════════════════════════ */
+let ytCache = {};
 
-  // Build mailto URL → opens Gmail/default email client
-  const body=replyText+'\n\n---\nOriginal Message:\nFrom: '+m.name+' ('+m.email+')\nService: '+(m.service||'N/A')+'\nBudget: '+(m.budget||'N/A')+'\nMessage: '+m.detail;
-  const mailtoUrl='mailto:'+encodeURIComponent(m.email)+'?subject='+encodeURIComponent(subjLine)+'&body='+encodeURIComponent(body);
-
-  // Open Gmail
-  window.open(mailtoUrl,'_blank');
-
-  // Save reply locally
-  const msgs=getM();
-  const mx=msgs.find(x=>x.id===id);
-  if(mx){mx.reply=replyText;mx.replied=true;mx.read=true;mx.replyDate=new Date().toISOString()}
-  setM(msgs);
-  closeM('gmailModal');
-  renderMessages();updateBadge();renderDash();
-  toast('Gmail opened! Reply saved to records ✓','success');
+async function loadYoutubeSettings() {
+  try {
+    const { doc, onSnapshot } = window.__fbModules;
+    onSnapshot(doc(db, 'settings', 'youtube'), snap => {
+      if (snap.exists()) {
+        ytCache = snap.data();
+        populateYoutubeForm();
+        updateYoutubePreview();
+      }
+    });
+  } catch(e) { console.warn('YT load error:', e.message); }
 }
 
-/* ══ SETTINGS ══ */
-function updateSettingsView(){
-  const p=getP(),m=getM(),g=getGmailCfg();
-  document.getElementById('qs-p').textContent=p.length;
-  document.getElementById('qs-m').textContent=m.length;
-  document.getElementById('qs-u').textContent=m.filter(x=>!x.read).length;
-  document.getElementById('qs-r').textContent=m.filter(x=>x.replied).length;
-  document.getElementById('qs-g').textContent=g.email;
-  document.getElementById('set-gmail').value=g.email;
-  document.getElementById('set-subj').value=g.subj;
+function populateYoutubeForm() {
+  const set = (id, val) => { const el = document.getElementById(id); if(el && val) el.value = val; };
+  set('yt-url',      ytCache.embedUrl || ytCache.videoUrl || '');
+  set('yt-title',    ytCache.title    || '');
+  set('yt-desc',     ytCache.desc     || '');
+  set('yt-channel',  ytCache.channel  || 'https://www.youtube.com/channel/UCda2mc_f-nIinjWpDUJiA2g');
+  set('yt-btn-txt',  ytCache.btnTxt   || 'Subscribe Now');
+  set('yt-heading',  ytCache.heading  || 'Tutorials, Tips & Behind the Scenes');
 }
 
-function exportData(){
-  const blob=new Blob([JSON.stringify({projects:getP(),messages:getM(),exported:new Date().toISOString()},null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='featuredesignz-data-'+Date.now()+'.json';a.click();
-  toast('Data exported!','success');
-}
-function importData(input){
-  const f=input.files[0];if(!f)return;
-  const r=new FileReader();
-  r.onload=e=>{
-    try{const d=JSON.parse(e.target.result);if(d.projects)setP(d.projects);if(d.messages)setM(d.messages);
-      renderDash();renderProjects();renderMessages();updateBadge();toast('Data imported!','success');
-    }catch{toast('Invalid file','error')}
-  };r.readAsText(f);input.value='';
-}
-function clearAll(){cfm('Clear All Data','Delete ALL projects and messages? Cannot be undone!',()=>{
-  localStorage.removeItem('fd_projects');localStorage.removeItem('fd_messages');
-  renderDash();renderProjects();renderMessages();updateBadge();toast('All data cleared','success');
-})}
+function updateYoutubePreview() {
+  // Title & desc preview
+  const titleEl = document.getElementById('yt-preview-title');
+  const descEl  = document.getElementById('yt-preview-desc');
+  const urlEl   = document.getElementById('yt-current-url');
+  const frameEl = document.getElementById('yt-preview-frame');
 
-/* ══ UI HELPERS ══ */
-function openM(id){document.getElementById(id).classList.add('open')}
-function closeM(id){document.getElementById(id).classList.remove('open')}
-document.querySelectorAll('.modal-bg').forEach(b=>b.addEventListener('click',e=>{if(e.target===b)b.classList.remove('open')}));
+  if (titleEl) titleEl.textContent = ytCache.title || '—';
+  if (descEl)  descEl.textContent  = ytCache.desc  || '';
+  if (urlEl)   urlEl.textContent   = ytCache.embedUrl || 'No video set yet';
 
-let cfmCb=null;
-function cfm(title,msg,cb){
-  document.getElementById('cfm-title').textContent=title;
-  document.getElementById('cfm-msg').textContent=msg;
-  cfmCb=cb;document.getElementById('cfmDlg').classList.add('open');
-}
-function closeCfm(){document.getElementById('cfmDlg').classList.remove('open');cfmCb=null}
-document.getElementById('cfm-ok').onclick=()=>{if(cfmCb)cfmCb();closeCfm()}
-
-let tTimer;
-function toast(msg,type='success'){
-  const el=document.getElementById('toast');
-  document.getElementById('t-ico').textContent=type==='success'?'✓':'✕';
-  document.getElementById('t-msg').textContent=msg;
-  el.className='show '+type;
-  clearTimeout(tTimer);tTimer=setTimeout(()=>el.classList.remove('show'),3500);
+  // Iframe preview
+  if (frameEl && ytCache.embedUrl) {
+    frameEl.innerHTML = `<iframe src="${ytCache.embedUrl}" style="width:100%;height:100%;border:none" allowfullscreen allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture"></iframe>`;
+  }
 }
 
-/* ══ AUTO LOGIN ══ */
-if(localStorage.getItem('fd_sess')==='1'){
-  document.getElementById('loginScreen').style.display='none';
-  document.getElementById('app').style.display='flex';
-  init();
+function ytUrlToEmbed(url) {
+  if (!url) return '';
+  url = url.trim();
+  // Already embed URL
+  if (url.includes('/embed/')) return url.split('?')[0];
+  // Watch URL: youtube.com/watch?v=ID
+  const wMatch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  if (wMatch) return 'https://www.youtube.com/embed/' + wMatch[1];
+  // Short URL: youtu.be/ID
+  const sMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  if (sMatch) return 'https://www.youtube.com/embed/' + sMatch[1];
+  // Playlist or channel embed already
+  if (url.includes('youtube.com')) return url;
+  return url;
 }
+
+window.saveYoutubeSettings = async function() {
+  const rawUrl  = document.getElementById('yt-url')?.value?.trim();
+  const title   = document.getElementById('yt-title')?.value?.trim();
+  const desc    = document.getElementById('yt-desc')?.value?.trim();
+  const channel = document.getElementById('yt-channel')?.value?.trim();
+  const btnTxt  = document.getElementById('yt-btn-txt')?.value?.trim();
+  const heading = document.getElementById('yt-heading')?.value?.trim();
+
+  const embedUrl = ytUrlToEmbed(rawUrl);
+
+  try {
+    const { doc, setDoc, serverTimestamp } = window.__fbModules;
+    await setDoc(doc(db, 'settings', 'youtube'), {
+      videoUrl: rawUrl,
+      embedUrl,
+      title:   title   || 'Feature Designz — Latest Work',
+      desc:    desc    || '',
+      channel: channel || 'https://www.youtube.com/channel/UCda2mc_f-nIinjWpDUJiA2g',
+      btnTxt:  btnTxt  || 'Subscribe Now',
+      heading: heading || 'Tutorials, Tips & Behind the Scenes',
+      updatedAt: serverTimestamp(),
+      updatedBy: currentUser?.email || 'admin'
+    });
+    ytCache = { videoUrl:rawUrl, embedUrl, title, desc, channel, btnTxt, heading };
+    updateYoutubePreview();
+    toast('YouTube section updated on live website! ⚡', 'success');
+  } catch(e) {
+    toast('Error saving: ' + e.message, 'error');
+  }
+};
+
+// Live preview while typing
+document.addEventListener('DOMContentLoaded', () => {
+  ['yt-url','yt-title','yt-desc'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', () => {
+      const url = document.getElementById('yt-url')?.value;
+      const titleVal = document.getElementById('yt-title')?.value;
+      const descVal  = document.getElementById('yt-desc')?.value;
+      const embed = ytUrlToEmbed(url);
+      const titleEl = document.getElementById('yt-preview-title');
+      const descEl  = document.getElementById('yt-preview-desc');
+      const urlEl   = document.getElementById('yt-current-url');
+      const frameEl = document.getElementById('yt-preview-frame');
+      if (titleEl) titleEl.textContent = titleVal || '—';
+      if (descEl)  descEl.textContent  = descVal  || '';
+      if (urlEl)   urlEl.textContent   = embed || 'Waiting for valid URL...';
+      if (frameEl && embed && embed.includes('/embed/')) {
+        frameEl.innerHTML = `<iframe src="${embed}" style="width:100%;height:100%;border:none" allowfullscreen allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture"></iframe>`;
+      }
+    });
+  });
+});
+
+function renderYoutubePage() {
+  populateYoutubeForm();
+  updateYoutubePreview();
+}
+
+// Update settings page on open
+document.addEventListener('DOMContentLoaded', () => {
+  const emailEl = document.getElementById('qs-email');
+  const roleEl  = document.getElementById('qs-role');
+  if (emailEl && currentUser) emailEl.textContent = currentUser.email;
+  if (roleEl  && currentRole) roleEl.textContent  = currentRole === 'main_admin' ? '★ Main Admin' : 'Admin';
+});
 </script>
 </body>
 </html>
