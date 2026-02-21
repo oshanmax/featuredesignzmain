@@ -1502,27 +1502,16 @@ tr:hover td{background:rgba(82,130,255,.03)}
           <div class="ph-title">Services <em>Status</em></div>
           <button class="btn btn-ghost btn-sm" onclick="resetAllServices()">↺ Reset All to Available</button>
         </div>
-        <!-- Project Visibility Quick Panel -->
-        <div style="background:var(--bg2);border:1px solid var(--bdr2);padding:20px;margin-bottom:22px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-            <div>
-              <div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:.96rem;margin-bottom:3px">🗂️ Project Visibility Quick Control</div>
-              <div style="font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.1em;color:var(--txt3);text-transform:uppercase">Show / Hide projects on live website</div>
-            </div>
-            <button class="btn btn-ghost btn-sm" onclick="gotoPage('project_view')">Full Projects View →</button>
-          </div>
-          <div id="svc-proj-quick" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px">
-            <div class="empty" style="padding:14px;grid-column:1/-1"><div class="empty-ico" style="font-size:1.4rem">📁</div><div class="empty-txt">Loading projects...</div></div>
-          </div>
+
+        <!-- INFO BANNER -->
+        <div style="background:rgba(82,130,255,.07);border:1px solid rgba(82,130,255,.2);padding:13px 18px;margin-bottom:24px;display:flex;align-items:center;gap:12px;font-size:.84rem;color:var(--txt2)">
+          <span style="font-size:1.3rem">⚡</span>
+          <div>Changes apply to the <strong style="color:var(--txt)">live website instantly</strong> — visitors see updated service badges in real-time without refresh.</div>
         </div>
 
-        <div style="background:rgba(82,130,255,.07);border:1px solid rgba(82,130,255,.2);padding:14px 18px;margin-bottom:22px;display:flex;align-items:center;gap:12px;font-size:.84rem;color:var(--txt2)">
-          <span style="font-size:1.4rem">⚡</span>
-          <div>Changes apply to the <strong style="color:var(--txt)">live website instantly</strong> in real-time — no refresh needed. Visitors will see updated badges immediately.</div>
-        </div>
-
+        <!-- 4 SERVICE CARDS -->
         <div class="svc-status-grid" id="svc-status-grid">
-          <!-- Rendered by JS -->
+          <!-- Rendered by renderServicePage() -->
         </div>
       </div>
 
@@ -1884,57 +1873,219 @@ function switchPvTab(id, el) {
    SERVICES STATUS MANAGEMENT
 ══════════════════════════════════════ */
 const SERVICES_DEF = [
-  { id:'web',    icon:'💻', name:'Full Stack Web Development', desc:'Websites, web apps, e-commerce, dashboards — React, Next.js, Laravel, Node.js.' },
-  { id:'mobile', icon:'📱', name:'App Development',           desc:'iOS & Android apps — Flutter, React Native, Firebase.' },
-  { id:'design', icon:'🎨', name:'Branding & Graphic Design', desc:'Logos, brand identity, social media kits, print materials.' },
-  { id:'video',  icon:'🎬', name:'Video Editing & Motion',    desc:'YouTube videos, reels, motion graphics, color grading.' }
+  {
+    id:    'web',
+    icon:  '💻',
+    name:  'Full Stack Web Development',
+    desc:  'Websites, web apps, e-commerce, dashboards — React, Next.js, Laravel, Node.js.',
+    accent:'linear-gradient(90deg,var(--blue),var(--cyan))'
+  },
+  {
+    id:    'mobile',
+    icon:  '📱',
+    name:  'App Development',
+    desc:  'iOS & Android apps — Flutter, React Native, Firebase backend.',
+    accent:'linear-gradient(90deg,var(--gold),var(--pink))'
+  },
+  {
+    id:    'design',
+    icon:  '🎨',
+    name:  'Branding & Graphic Design',
+    desc:  'Logos, brand identity, social media kits, UI/UX, print materials.',
+    accent:'linear-gradient(90deg,var(--mint),var(--cyan))'
+  },
+  {
+    id:    'video',
+    icon:  '🎬',
+    name:  'Video Editing & Motion',
+    desc:  'YouTube videos, reels, motion graphics, color grading, thumbnails.',
+    accent:'linear-gradient(90deg,var(--pink),var(--gold))'
+  }
 ];
 
-const STATUS_INFO = {
-  available:   { label:'Now Available',  cls:'active-avail', badge:'● Now Available',  color:'var(--mint)' },
-  coming_soon: { label:'Coming Soon',    cls:'active-soon',  badge:'◎ Coming Soon',    color:'var(--gold)' },
-  off:         { label:'Off',            cls:'active-off',   badge:'○ Not Available',  color:'var(--txt3)' }
-};
+// 3 status options
+const SVC_STATUS_OPTIONS = [
+  {
+    key:   'available',
+    label: 'Now Available',
+    icon:  '✅',
+    badge: '● Now Available',
+    bg:    'rgba(62,240,184,0.12)',
+    color: 'var(--mint)',
+    border:'rgba(62,240,184,0.35)',
+  },
+  {
+    key:   'coming_soon',
+    label: 'Coming Soon',
+    icon:  '⏳',
+    badge: '◎ Coming Soon',
+    bg:    'rgba(245,200,66,0.12)',
+    color: 'var(--gold)',
+    border:'rgba(245,200,66,0.35)',
+  },
+  {
+    key:   'off',
+    label: 'Off / Unavailable',
+    icon:  '🚫',
+    badge: '○ Not Available',
+    bg:    'rgba(74,88,128,0.12)',
+    color: 'var(--txt3)',
+    border:'rgba(74,88,128,0.3)',
+  }
+];
 
 let servicesCache = {};
-let unsubServices = null;
 
 function subscribeServices() {
   const _db = window.__db;
-  if (!_db) { console.warn('db not ready for services'); return; }
-  const { onSnapshot, doc } = window.__fbModules;
+  if (!_db) { setTimeout(subscribeServices, 600); return; }
+  const { doc, onSnapshot } = window.__fbModules;
   SERVICES_DEF.forEach(svc => {
     onSnapshot(doc(_db, 'services', svc.id), snap => {
-      const status = snap.exists() ? (snap.data().status || 'available') : 'available';
-      servicesCache[svc.id] = status;
-      renderSvcCard(svc.id);
+      servicesCache[svc.id] = snap.exists() ? (snap.data().status || 'available') : 'available';
+      // Update card if already rendered
+      updateSvcCard(svc.id);
     });
   });
 }
 
+function renderServicePage() {
+  const grid = document.getElementById('svc-status-grid');
+  if (!grid) return;
+
+  grid.innerHTML = SERVICES_DEF.map(svc => `
+    <div class="svc-card-admin s-${svc.id}" id="sca-${svc.id}">
+
+      <!-- Top accent bar -->
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${svc.accent}"></div>
+
+      <!-- Header -->
+      <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:16px">
+        <span style="font-size:2rem;line-height:1">${svc.icon}</span>
+        <div style="flex:1">
+          <div class="sca-name">${svc.name}</div>
+          <div class="sca-desc">${svc.desc}</div>
+        </div>
+      </div>
+
+      <!-- Current badge -->
+      <div style="margin-bottom:16px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:.52rem;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3);margin-bottom:7px">Current Status</div>
+        <div id="sca-badge-${svc.id}" style="display:inline-flex;align-items:center;gap:7px;font-family:'JetBrains Mono',monospace;font-size:.65rem;letter-spacing:.1em;padding:7px 16px;border:1px solid rgba(62,240,184,.35);background:rgba(62,240,184,.12);color:var(--mint)">
+          ● Now Available
+        </div>
+      </div>
+
+      <!-- 3 toggle buttons -->
+      <div style="display:flex;flex-direction:column;gap:7px">
+        ${SVC_STATUS_OPTIONS.map(opt => `
+          <button
+            id="stog-${svc.id}-${opt.key}"
+            class="svc-toggle-btn"
+            onclick="setServiceStatus('${svc.id}','${opt.key}')"
+            style="
+              display:flex;align-items:center;gap:10px;
+              width:100%;padding:11px 14px;
+              background:transparent;border:1px solid var(--bdr);
+              color:var(--txt3);font-family:'Inter',sans-serif;font-size:.82rem;font-weight:500;
+              cursor:pointer;transition:all .22s;text-align:left;
+            ">
+            <span style="font-size:1rem">${opt.icon}</span>
+            <span>${opt.label}</span>
+            <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:.54rem;letter-spacing:.1em;padding:3px 9px;border:1px solid currentColor;opacity:.7">${opt.badge}</span>
+          </button>`).join('')}
+      </div>
+    </div>`).join('');
+
+  // Apply current statuses
+  SERVICES_DEF.forEach(svc => updateSvcCard(svc.id));
+}
+
+function updateSvcCard(sid) {
+  const status  = servicesCache[sid] || 'available';
+  const opt     = SVC_STATUS_OPTIONS.find(o => o.key === status) || SVC_STATUS_OPTIONS[0];
+
+  // Update badge
+  const badge = document.getElementById('sca-badge-' + sid);
+  if (badge) {
+    badge.textContent = opt.badge;
+    badge.style.color       = opt.color;
+    badge.style.background  = opt.bg;
+    badge.style.borderColor = opt.border;
+  }
+
+  // Update card dim for 'off'
+  const card = document.getElementById('sca-' + sid);
+  if (card) card.style.opacity = status === 'off' ? '0.55' : '1';
+
+  // Update button highlights
+  SVC_STATUS_OPTIONS.forEach(o => {
+    const btn = document.getElementById('stog-' + sid + '-' + o.key);
+    if (!btn) return;
+    if (o.key === status) {
+      btn.style.background   = o.bg;
+      btn.style.borderColor  = o.border;
+      btn.style.color        = o.color;
+      btn.style.transform    = 'translateX(4px)';
+    } else {
+      btn.style.background   = 'transparent';
+      btn.style.borderColor  = 'var(--bdr)';
+      btn.style.color        = 'var(--txt3)';
+      btn.style.transform    = '';
+    }
+  });
+}
+
+window.setServiceStatus = async function(sid, status) {
+  const _db = window.__db;
+  if (!_db) { toast('Database not ready', 'error'); return; }
+  const opt = SVC_STATUS_OPTIONS.find(o => o.key === status);
+  try {
+    const { doc, setDoc, serverTimestamp } = window.__fbModules;
+    await setDoc(doc(_db, 'services', sid), {
+      status,
+      label:     opt?.badge || status,
+      updatedAt: serverTimestamp(),
+      updatedBy: window.currentUser?.email || 'admin'
+    });
+    servicesCache[sid] = status;
+    updateSvcCard(sid);
+    toast('Service updated → ' + (opt?.label || status) + ' ⚡', 'success');
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+  }
+};
+
+window.resetAllServices = function() {
+  cfm('Reset All Services', 'Set all 4 services to "Now Available"?', async () => {
+    for (const svc of SERVICES_DEF) {
+      await setServiceStatus(svc.id, 'available');
+    }
+    toast('All services reset to Available ✓', 'success');
+  });
+};
+
+// Project quick panel (still accessible from Services page)
 function renderSvcProjectQuick() {
   const el = document.getElementById('svc-proj-quick');
   if (!el) return;
-  const visible = projectsCache.filter(p => p.status !== 'off');
-  const hidden  = projectsCache.filter(p => p.status === 'off');
-  const all = [...visible, ...hidden];
+  const all = [...projectsCache].sort((a,b) => (a.status==='off'?1:-1));
   if (!all.length) {
-    el.innerHTML = '<div class="empty" style="padding:14px;grid-column:1/-1"><div class="empty-ico" style="font-size:1.4rem">📁</div><div class="empty-txt">No projects yet — add from Manage Projects</div></div>';
+    el.innerHTML = '<div class="empty" style="padding:14px;grid-column:1/-1"><div class="empty-ico" style="font-size:1.4rem">📁</div><div class="empty-txt">No projects yet</div></div>';
     return;
   }
   el.innerHTML = all.map(p => {
     const isOff = p.status === 'off' || p.display === false;
     const col = isOff ? 'var(--red)' : 'var(--mint)';
-    const icon = isOff ? '🚫' : '✅';
     return `
-      <div style="background:var(--bg3);border:1px solid ${isOff ? 'rgba(248,113,113,.2)' : 'var(--bdr)'};padding:10px 12px;display:flex;align-items:center;gap:9px;opacity:${isOff ? '.7' : '1'}">
-        <span style="font-size:1.1rem">${p.emoji || '📁'}</span>
+      <div style="background:var(--bg3);border:1px solid ${isOff?'rgba(248,113,113,.2)':'var(--bdr)'};padding:10px 12px;display:flex;align-items:center;gap:9px;opacity:${isOff?.7:1}">
+        <span style="font-size:1.1rem">${p.emoji||'📁'}</span>
         <div style="flex:1;min-width:0">
           <div style="font-size:.8rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</div>
-          <div style="font-family:'JetBrains Mono',monospace;font-size:.54rem;color:${col};margin-top:2px">${icon} ${isOff ? 'Hidden' : 'Visible'}</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:.54rem;color:${col};margin-top:2px">${isOff?'🚫 Hidden':'✅ Visible'}</div>
         </div>
         <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:.62rem;flex-shrink:0"
-          onclick="toggleProjDisplay('${p.id}',${!isOff})">${isOff ? '👁 Show' : '🚫 Hide'}</button>
+          onclick="toggleProjDisplay('${p.id}',${!isOff})">${isOff?'👁 Show':'🚫 Hide'}</button>
       </div>`;
   }).join('');
 }
@@ -1944,264 +2095,13 @@ window.toggleProjDisplay = async function(id, makeHidden) {
   if (!_db) { toast('Database not ready', 'error'); return; }
   try {
     const { doc, updateDoc } = window.__fbModules;
-    const newStatus = makeHidden ? 'off' : 'completed';
     const p = projectsCache.find(x => x.id === id);
-    // If hiding, set status=off; if showing, restore previous or default to completed
-    const restoreStatus = p?.prevStatus || 'completed';
     await updateDoc(doc(_db, 'projects', id), {
-      status:  makeHidden ? 'off' : restoreStatus,
-      display: !makeHidden,
+      status:     makeHidden ? 'off' : (p?.prevStatus || 'completed'),
+      display:    !makeHidden,
       prevStatus: makeHidden ? (p?.status || 'completed') : p?.prevStatus
     });
-    toast(makeHidden ? 'Project hidden from website ✓' : 'Project visible on website ✓', 'success');
-  } catch(e) { toast('Error: ' + e.message, 'error'); }
-};
-
-function renderServicePage() {
-  renderSvcProjectQuick();
-  const grid = document.getElementById('svc-status-grid');
-  if (!grid) return;
-  grid.innerHTML = SERVICES_DEF.map(svc => `
-    <div class="svc-card-admin s-${svc.id}" id="sca-${svc.id}">
-      <div class="sca-icon">${svc.icon}</div>
-      <div class="sca-name">${svc.name}</div>
-      <div class="sca-desc">${svc.desc}</div>
-      <div class="sca-current">
-        <span class="sca-current-lbl">Current Status:</span>
-        <span id="sca-status-txt-${svc.id}" style="color:var(--mint)">Loading...</span>
-      </div>
-      <div class="status-toggle-row">
-        <button class="stog" id="stog-${svc.id}-available"   onclick="setServiceStatus('${svc.id}','available')">✅ Now Available</button>
-        <button class="stog" id="stog-${svc.id}-coming_soon" onclick="setServiceStatus('${svc.id}','coming_soon')">⏳ Coming Soon</button>
-        <button class="stog" id="stog-${svc.id}-off"         onclick="setServiceStatus('${svc.id}','off')">🚫 Off</button>
-      </div>
-    </div>`).join('');
-
-  // Apply cached statuses
-  SERVICES_DEF.forEach(svc => renderSvcCard(svc.id));
-}
-
-function renderSvcCard(sid) {
-  const status = servicesCache[sid] || 'available';
-  const info   = STATUS_INFO[status];
-
-  // Update status text
-  const txt = document.getElementById('sca-status-txt-' + sid);
-  if (txt) { txt.textContent = info.badge; txt.style.color = info.color; }
-
-  // Update card dim
-  const card = document.getElementById('sca-' + sid);
-  if (card) card.classList.toggle('status-off', status === 'off');
-
-  // Update toggle buttons
-  ['available','coming_soon','off'].forEach(st => {
-    const btn = document.getElementById('stog-' + sid + '-' + st);
-    if (!btn) return;
-    btn.className = 'stog' + (st === status ? ' ' + STATUS_INFO[st].cls : '');
-  });
-}
-
-window.setServiceStatus = async function(sid, status) {
-  const _db = window.__db;
-  if (!_db) { toast('Database not ready', 'error'); return; }
-  try {
-    const { doc, setDoc, serverTimestamp } = window.__fbModules;
-    await setDoc(doc(_db, 'services', sid), {
-      status,
-      updatedAt: serverTimestamp(),
-      updatedBy: window.window.currentUser?.email || 'admin'
-    });
-    servicesCache[sid] = status;
-    renderSvcCard(sid);
-    toast('Service status updated on live website! ⚡', 'success');
-  } catch(e) {
-    toast('Error: ' + e.message, 'error');
-  }
-};
-
-window.resetAllServices = function() {
-  cfm('Reset All Services', 'Set all 4 services to "Now Available"?', async () => {
-    await Promise.all(SERVICES_DEF.map(svc => setServiceStatus(svc.id, 'available')));
-    toast('All services reset to Available ✓', 'success');
-  });
-};
-
-/* ══════════════════════════════════════
-   YOUTUBE SECTION MANAGEMENT
-══════════════════════════════════════ */
-let ytCache = {};
-
-async function loadYoutubeSettings() {
-  const _db = window.__db;
-  if (!_db) { setTimeout(loadYoutubeSettings, 800); return; }
-  try {
-    const { doc, onSnapshot } = window.__fbModules;
-    onSnapshot(doc(_db, 'settings', 'youtube'), snap => {
-      if (snap.exists()) {
-        ytCache = snap.data();
-        populateYoutubeForm();
-        updateYoutubePreview();
-      }
-    });
-  } catch(e) { console.warn('YT load error:', e.message); }
-}
-
-function populateYoutubeForm() {
-  const set = (id, val) => { const el = document.getElementById(id); if(el && val) el.value = val; };
-  set('yt-url',      ytCache.embedUrl || ytCache.videoUrl || '');
-  set('yt-title',    ytCache.title    || '');
-  set('yt-desc',     ytCache.desc     || '');
-  set('yt-channel',  ytCache.channel  || 'https://www.youtube.com/channel/UCda2mc_f-nIinjWpDUJiA2g');
-  set('yt-btn-txt',  ytCache.btnTxt   || 'Subscribe Now');
-  set('yt-heading',  ytCache.heading  || 'Tutorials, Tips & Behind the Scenes');
-}
-
-function updateYoutubePreview() {
-  // Title & desc preview
-  const titleEl = document.getElementById('yt-preview-title');
-  const descEl  = document.getElementById('yt-preview-desc');
-  const urlEl   = document.getElementById('yt-current-url');
-  const frameEl = document.getElementById('yt-preview-frame');
-
-  if (titleEl) titleEl.textContent = ytCache.title || '—';
-  if (descEl)  descEl.textContent  = ytCache.desc  || '';
-  if (urlEl)   urlEl.textContent   = ytCache.embedUrl || 'No video set yet';
-
-  // Iframe preview
-  if (frameEl && ytCache.embedUrl) {
-    frameEl.innerHTML = `<iframe src="${ytCache.embedUrl}" style="width:100%;height:100%;border:none" allowfullscreen allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture"></iframe>`;
-  }
-}
-
-function ytUrlToEmbed(url) {
-  if (!url) return '';
-  url = url.trim();
-  // Already embed URL
-  if (url.includes('/embed/')) return url.split('?')[0];
-  // Watch URL: youtube.com/watch?v=ID
-  const wMatch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
-  if (wMatch) return 'https://www.youtube.com/embed/' + wMatch[1];
-  // Short URL: youtu.be/ID
-  const sMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
-  if (sMatch) return 'https://www.youtube.com/embed/' + sMatch[1];
-  // Playlist or channel embed already
-  if (url.includes('youtube.com')) return url;
-  return url;
-}
-
-window.saveYoutubeSettings = async function() {
-  const rawUrl  = document.getElementById('yt-url')?.value?.trim();
-  const title   = document.getElementById('yt-title')?.value?.trim();
-  const desc    = document.getElementById('yt-desc')?.value?.trim();
-  const channel = document.getElementById('yt-channel')?.value?.trim();
-  const btnTxt  = document.getElementById('yt-btn-txt')?.value?.trim();
-  const heading = document.getElementById('yt-heading')?.value?.trim();
-
-  const embedUrl = ytUrlToEmbed(rawUrl);
-
-  const _db = window.__db;
-  if (!_db) { toast('Database not ready', 'error'); return; }
-  try {
-    const { doc, setDoc, serverTimestamp } = window.__fbModules;
-    await setDoc(doc(_db, 'settings', 'youtube'), {
-      videoUrl: rawUrl,
-      embedUrl,
-      title:   title   || 'Feature Designz — Latest Work',
-      desc:    desc    || '',
-      channel: channel || 'https://www.youtube.com/channel/UCda2mc_f-nIinjWpDUJiA2g',
-      btnTxt:  btnTxt  || 'Subscribe Now',
-      heading: heading || 'Tutorials, Tips & Behind the Scenes',
-      updatedAt: serverTimestamp(),
-      updatedBy: window.window.currentUser?.email || 'admin'
-    });
-    ytCache = { videoUrl:rawUrl, embedUrl, title, desc, channel, btnTxt, heading };
-    updateYoutubePreview();
-    toast('YouTube section updated on live website! ⚡', 'success');
-  } catch(e) {
-    toast('Error saving: ' + e.message, 'error');
-  }
-};
-
-// Live preview while typing
-document.addEventListener('DOMContentLoaded', () => {
-  ['yt-url','yt-title','yt-desc'].forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.addEventListener('input', () => {
-      const url = document.getElementById('yt-url')?.value;
-      const titleVal = document.getElementById('yt-title')?.value;
-      const descVal  = document.getElementById('yt-desc')?.value;
-      const embed = ytUrlToEmbed(url);
-      const titleEl = document.getElementById('yt-preview-title');
-      const descEl  = document.getElementById('yt-preview-desc');
-      const urlEl   = document.getElementById('yt-current-url');
-      const frameEl = document.getElementById('yt-preview-frame');
-      if (titleEl) titleEl.textContent = titleVal || '—';
-      if (descEl)  descEl.textContent  = descVal  || '';
-      if (urlEl)   urlEl.textContent   = embed || 'Waiting for valid URL...';
-      if (frameEl && embed && embed.includes('/embed/')) {
-        frameEl.innerHTML = `<iframe src="${embed}" style="width:100%;height:100%;border:none" allowfullscreen allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture"></iframe>`;
-      }
-    });
-  });
-});
-
-function renderYoutubePage() {
-  populateYoutubeForm();
-  updateYoutubePreview();
-}
-
-/* ══════════════════════════════════════
-   SOCIAL MEDIA MANAGEMENT
-══════════════════════════════════════ */
-const SOCIAL_FIELDS = [
-  { id:'youtube',   field:'sl-youtube',   label:'YouTube'   },
-  { id:'facebook',  field:'sl-facebook',  label:'Facebook'  },
-  { id:'instagram', field:'sl-instagram', label:'Instagram' },
-  { id:'whatsapp',  field:'sl-whatsapp',  label:'WhatsApp'  },
-  { id:'tiktok',    field:'sl-tiktok',    label:'TikTok'    },
-  { id:'twitter',   field:'sl-twitter',   label:'X/Twitter' },
-  { id:'linkedin',  field:'sl-linkedin',  label:'LinkedIn'  },
-  { id:'github',    field:'sl-github',    label:'GitHub'    },
-];
-
-let socialCache = {};
-let unsubSocial = null;
-
-function subscribeSocial() {
-  const _db = window.__db;
-  if (!_db) { setTimeout(subscribeSocial, 600); return; }
-  const { doc, onSnapshot } = window.__fbModules;
-  onSnapshot(doc(_db, 'settings', 'social'), snap => {
-    socialCache = snap.exists() ? snap.data() : {};
-    populateSocialForm();
-  });
-}
-
-function populateSocialForm() {
-  SOCIAL_FIELDS.forEach(f => {
-    const el = document.getElementById(f.field);
-    if (el && socialCache[f.id] !== undefined) el.value = socialCache[f.id];
-  });
-}
-
-function renderSocialPage() {
-  populateSocialForm();
-}
-
-window.saveSocialLinks = async function() {
-  const _db = window.__db;
-  if (!_db) { toast('Database not ready', 'error'); return; }
-  const data = { updatedAt: window.__fbModules.serverTimestamp(), updatedBy: window.window.currentUser?.email || 'admin' };
-  SOCIAL_FIELDS.forEach(f => {
-    const el = document.getElementById(f.field);
-    data[f.id] = el ? el.value.trim() : '';
-  });
-  try {
-    const { doc, setDoc } = window.__fbModules;
-    await setDoc(doc(_db, 'settings', 'social'), data);
-    socialCache = data;
-    toast('Social media links updated on live website! ⚡', 'success');
+    toast(makeHidden ? 'Project hidden ✓' : 'Project visible ✓', 'success');
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 };
 
