@@ -1011,30 +1011,8 @@ window.addEventListener('scroll',()=>{
   document.querySelector('nav').style.background=y>60?'rgba(2,5,16,0.97)':'rgba(2,5,16,0.82)';
 });
 
-// FILTER — works with dynamic Firebase cards
-let _activeFilter = 'all';
-document.getElementById('fBar').addEventListener('click',e=>{
-  if(!e.target.classList.contains('pf'))return;
-  document.querySelectorAll('.pf').forEach(b=>b.classList.remove('on'));
-  e.target.classList.add('on');
-  _activeFilter = e.target.dataset.f;
-  applyProjectFilter(_activeFilter);
-});
-function applyProjectFilter(f){
-  document.querySelectorAll('.pcard-dyn').forEach(c=>{
-    const show = f==='all' || c.dataset.cat===f;
-    if(show){
-      c.style.display='';c.style.opacity='0';c.style.transform='translateY(12px)';
-      requestAnimationFrame(()=>setTimeout(()=>{
-        c.style.transition='opacity .4s,transform .4s,border-color .3s,box-shadow .4s';
-        c.style.opacity='1';c.style.transform='none';
-      },20));
-    } else {
-      c.style.transition='opacity .2s';c.style.opacity='0';
-      setTimeout(()=>c.style.display='none',220);
-    }
-  });
-}
+// Filter handled by unified loader below
+
 
 // ══════════════════════════════════════
 // SOCIAL LINKS — Load from Firebase
