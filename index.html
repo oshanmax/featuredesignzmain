@@ -711,8 +711,8 @@ footer{background:var(--bg1);border-top:1px solid var(--bdr);padding:56px 60px 3
       <div><span class="code-cm">// Feature Designz Studio</span></div>
       <div><span class="code-kw">const</span> studio = {</div>
       <div>&nbsp;&nbsp;services: [<span class="code-str">'WebDev'</span>, <span class="code-str">'Mobile'</span>, <span class="code-str">'Design'</span>, <span class="code-str">'Video'</span>],</div>
-      <div>&nbsp;&nbsp;experience: <span class="code-num">3</span>+ <span class="code-cm">// years</span></div>
-      <div>&nbsp;&nbsp;projects: <span class="code-num">50</span>+, clients: <span class="code-fn">satisfied</span>()</div>
+      <div>&nbsp;&nbsp;experience: <span class="code-num" id="cb-years">3</span>+ <span class="code-cm">// years</span></div>
+      <div>&nbsp;&nbsp;projects: <span class="code-num" id="cb-projects">50</span>+, clients: <span class="code-fn">satisfied</span>()</div>
       <div>}</div>
     </div>
 
@@ -747,9 +747,9 @@ footer{background:var(--bg1);border-top:1px solid var(--bdr);padding:56px 60px 3
         <span class="pill">Premiere</span>
       </div>
       <div class="fc-metrics" style="margin-top:16px">
-        <div class="fc-m"><div class="fc-m-n">50+</div><div class="fc-m-l">Projects</div></div>
-        <div class="fc-m"><div class="fc-m-n">30+</div><div class="fc-m-l">Clients</div></div>
-        <div class="fc-m"><div class="fc-m-n">3+</div><div class="fc-m-l">Years</div></div>
+        <div class="fc-m"><div class="fc-m-n" id="hs-projects">50+</div><div class="fc-m-l">Projects</div></div>
+        <div class="fc-m"><div class="fc-m-n" id="hs-clients">30+</div><div class="fc-m-l">Clients</div></div>
+        <div class="fc-m"><div class="fc-m-n" id="hs-years">3+</div><div class="fc-m-l">Years</div></div>
       </div>
     </div>
 
@@ -1112,7 +1112,7 @@ footer{background:var(--bg1);border-top:1px solid var(--bdr);padding:56px 60px 3
     </div>
   </div>
   <div class="ft-bot">
-    <div class="ft-copy">© 2025 <em>Feature Designz</em>. Built with passion in Sri Lanka 🇱🇰</div>
+    <div class="ft-copy">© 2026 <em>Feature Designz</em>. Built with passion in Sri Lanka 🇱🇰</div>
     <div class="ft-ics">
       <a href="https://www.youtube.com/channel/UCda2mc_f-nIinjWpDUJiA2g" target="_blank" class="ft-ic" id="ft-yt"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg></a>
       <a href="https://www.instagram.com/featuredesignz" target="_blank" class="ft-ic" id="ft-ig"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>
@@ -1520,6 +1520,11 @@ function fdEsc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;
       applyStudioStatus(d);
     });
 
+    // ── 6. HERO STATS ────────────────
+    onSnapshot(doc(db,'settings','heroStats'), snap => {
+      if (snap.exists()) applyHeroStats(snap.data());
+    });
+
     // ── 4. YOUTUBE ───────────────────
     onSnapshot(doc(db,'settings','youtube'), snap => {
       if (snap.exists()) applyYoutube(snap.data());
@@ -1667,6 +1672,18 @@ function applyServiceBadge(sid, status) {
 
 // Default all available while loading
 ['web','mobile','design','video'].forEach(sid => applyServiceBadge(sid,'available'));
+
+// ── HERO STATS ───────────────────────
+function applyHeroStats(data) {
+  const set = (id, val) => { const el=document.getElementById(id); if(el&&val) el.textContent=val; };
+  set('hs-projects', data.projects || '50+');
+  set('hs-clients',  data.clients  || '30+');
+  set('hs-years',    data.years    || '3+');
+  // Sync code block numbers (strip non-digits for the code block)
+  const setNum = (id, val) => { const el=document.getElementById(id); if(el&&val) el.textContent=String(val).replace(/[^0-9]/g,''); };
+  setNum('cb-projects', data.projects || '50');
+  setNum('cb-years',    data.years    || '3');
+}
 
 // ── STUDIO STATUS ────────────────────
 function applyStudioStatus(data) {

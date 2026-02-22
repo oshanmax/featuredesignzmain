@@ -246,6 +246,7 @@ function initApp(user, role) {
   subscribeSocial();
   subscribeStudioStatus();
   loadAiSettings();
+  subscribeHeroStats();
   if (role === 'main_admin') subscribeAdmins();
 
   // Show dashboard
@@ -797,12 +798,13 @@ window.gotoPage = function(id) {
   document.querySelectorAll('.sb-it').forEach(i => {
     if (i.getAttribute('onclick')?.includes("'" + id + "'")) i.classList.add('on');
   });
-  const titles = { dashboard:'Dashboard', projects:'All Projects', project_view:'Projects Overview', messages:'Messages', website:'Website Overview', studio:'Studio Status', services:'Services Status', youtube:'YouTube Section', social:'Social Media Links', admins:'Admin Management', settings:'Settings' };
+  const titles = { dashboard:'Dashboard', projects:'All Projects', project_view:'Projects Overview', messages:'Messages', website:'Website Overview', herostats:'Hero Stats', studio:'Studio Status', services:'Services Status', youtube:'YouTube Section', social:'Social Media Links', admins:'Admin Management', settings:'Settings' };
   const el = document.getElementById('tb-title');
   if (el) el.textContent = titles[id] || id;
   if (id === 'dashboard') renderDash();
   if (id === 'project_view') renderProjectsSection();
   if (id === 'website')  renderWebsitePage();
+  if (id === 'herostats') renderHeroStatsPage();
   if (id === 'studio')   renderStudioPage();
   if (id === 'services') renderServicePage();
   if (id === 'youtube')  renderYoutubePage();
@@ -1280,6 +1282,10 @@ tr:hover td{background:rgba(82,130,255,.03)}
         <svg class="sb-ico" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.083 9h1.946c.089-1.546.383-2.97.837-4.118A6.004 6.004 0 004.083 9zM10 2a8 8 0 100 16 8 8 0 000-16zm0 2c-.076 0-.232.032-.465.262-.238.234-.497.623-.737 1.182-.389.907-.673 2.142-.766 3.556h3.936c-.093-1.414-.377-2.649-.766-3.556-.24-.56-.5-.948-.737-1.182C10.232 4.032 10.076 4 10 4zm3.971 5c-.089-1.546-.383-2.97-.837-4.118A6.004 6.004 0 0115.917 9h-1.946zm-2.003 2H8.032c.093 1.414.377 2.649.766 3.556.24.56.5.948.737 1.182.233.23.389.262.465.262.076 0 .232-.032.465-.262.238-.234.498-.623.737-1.182.389-.907.673-2.142.766-3.556zm1.166 4.118c.454-1.147.748-2.572.837-4.118h1.946a6.004 6.004 0 01-2.783 4.118zm-6.268 0C6.412 13.97 6.118 12.546 6.03 11H4.083a6.004 6.004 0 002.783 4.118z" clip-rule="evenodd"/></svg>
         Website Overview
       </div>
+      <div class="sb-it" onclick="gotoPage('herostats')">
+        <svg class="sb-ico" viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
+        Hero Stats
+      </div>
       <div class="sb-it" onclick="gotoPage('studio')">
         <svg class="sb-ico" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
         Studio Status
@@ -1519,6 +1525,82 @@ tr:hover td{background:rgba(82,130,255,.03)}
             </div>
 
           </div>
+        </div>
+      </div>
+
+      <!-- HERO STATS -->
+      <div class="page" id="page-herostats">
+        <div class="ph">
+          <div class="ph-title">Hero <em>Stats</em></div>
+        </div>
+
+        <div style="max-width:640px;margin:0 auto">
+          <div style="background:rgba(82,130,255,.07);border:1px solid rgba(82,130,255,.2);padding:13px 18px;margin-bottom:24px;display:flex;align-items:center;gap:12px;font-size:.84rem;color:var(--txt2)">
+            <span style="font-size:1.3rem">📊</span>
+            <div>These numbers appear on the <strong style="color:var(--txt)">hero section</strong> of the live website and in the code block. Changes apply instantly.</div>
+          </div>
+
+          <!-- Live Preview -->
+          <div style="background:var(--bg2);border:1px solid var(--bdr);padding:22px;margin-bottom:20px;text-align:center">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:.55rem;letter-spacing:.18em;text-transform:uppercase;color:var(--txt3);margin-bottom:16px">Live Preview</div>
+            <div style="display:flex;justify-content:center;gap:40px">
+              <div style="text-align:center">
+                <div id="hs-prev-projects" style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:2rem;background:linear-gradient(135deg,#fff,var(--blue2));-webkit-background-clip:text;-webkit-text-fill-color:transparent">50+</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3);margin-top:4px">Projects</div>
+              </div>
+              <div style="text-align:center">
+                <div id="hs-prev-clients" style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:2rem;background:linear-gradient(135deg,#fff,var(--blue2));-webkit-background-clip:text;-webkit-text-fill-color:transparent">30+</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3);margin-top:4px">Clients</div>
+              </div>
+              <div style="text-align:center">
+                <div id="hs-prev-years" style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:2rem;background:linear-gradient(135deg,#fff,var(--blue2));-webkit-background-clip:text;-webkit-text-fill-color:transparent">3+</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3);margin-top:4px">Years</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Edit Fields -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+
+            <div style="background:var(--bg2);border:1px solid var(--bdr);padding:18px;text-align:center">
+              <div style="font-size:1.5rem;margin-bottom:8px">🗂️</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.14em;text-transform:uppercase;color:var(--txt3);margin-bottom:10px">Projects</div>
+              <input class="fi" id="hs-projects" type="text" value="50+" placeholder="50+" style="text-align:center;font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.2rem"
+                oninput="hsPreview()">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--txt3);margin-top:6px">e.g. 50+ or 100+</div>
+            </div>
+
+            <div style="background:var(--bg2);border:1px solid var(--bdr);padding:18px;text-align:center">
+              <div style="font-size:1.5rem;margin-bottom:8px">🤝</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.14em;text-transform:uppercase;color:var(--txt3);margin-bottom:10px">Clients</div>
+              <input class="fi" id="hs-clients" type="text" value="30+" placeholder="30+" style="text-align:center;font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.2rem"
+                oninput="hsPreview()">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--txt3);margin-top:6px">e.g. 30+ or 50+</div>
+            </div>
+
+            <div style="background:var(--bg2);border:1px solid var(--bdr);padding:18px;text-align:center">
+              <div style="font-size:1.5rem;margin-bottom:8px">📅</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.14em;text-transform:uppercase;color:var(--txt3);margin-bottom:10px">Years</div>
+              <input class="fi" id="hs-years" type="text" value="3+" placeholder="3+" style="text-align:center;font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.2rem"
+                oninput="hsPreview()">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--txt3);margin-top:6px">e.g. 3+ or 5+</div>
+            </div>
+          </div>
+
+          <!-- Code block preview -->
+          <div style="background:#050c1e;border:1px solid rgba(82,130,255,.2);padding:16px 20px;margin-bottom:20px;font-family:'JetBrains Mono',monospace;font-size:.78rem;line-height:1.9">
+            <div style="color:var(--txt3);margin-bottom:8px;font-size:.55rem;letter-spacing:.16em;text-transform:uppercase">Code Block Preview</div>
+            <div style="color:#8899cc">// Feature Designz Studio</div>
+            <div><span style="color:#7ba4ff">const</span> <span style="color:#3ef0b8">studio</span> = {</div>
+            <div>&nbsp;&nbsp;services: [<span style="color:#f5c842">'WebDev'</span>, <span style="color:#f5c842">'Mobile'</span>, <span style="color:#f5c842">'Design'</span>, <span style="color:#f5c842">'Video'</span>],</div>
+            <div>&nbsp;&nbsp;experience: <span id="hs-code-years" style="color:#f5c842">3</span>+ <span style="color:#8899cc">// years</span></div>
+            <div>&nbsp;&nbsp;projects: <span id="hs-code-projects" style="color:#f5c842">50</span>+, clients: <span style="color:#3ef0b8">satisfied</span>()</div>
+            <div>}</div>
+          </div>
+
+          <button class="btn btn-primary" onclick="saveHeroStats()" style="width:100%;justify-content:center;padding:13px;font-size:.85rem">
+            ⚡ Save & Apply to Live Website
+          </button>
         </div>
       </div>
 
@@ -2427,6 +2509,62 @@ function updateWsStudio(status) {
     }
   });
 }
+
+/* ══════════════════════════════════════
+   HERO STATS MANAGEMENT
+══════════════════════════════════════ */
+let heroStatsCache = { projects:'50+', clients:'30+', years:'3+' };
+
+function subscribeHeroStats() {
+  const _db = window.__db;
+  if (!_db) { setTimeout(subscribeHeroStats, 600); return; }
+  const { doc, onSnapshot } = window.__fbModules;
+  onSnapshot(doc(_db, 'settings', 'heroStats'), snap => {
+    if (snap.exists()) {
+      heroStatsCache = snap.data();
+      renderHeroStatsPage();
+    }
+  });
+}
+
+function renderHeroStatsPage() {
+  const set = (id, val) => { const el=document.getElementById(id); if(el&&val!==undefined) el.value=val; };
+  set('hs-projects', heroStatsCache.projects || '50+');
+  set('hs-clients',  heroStatsCache.clients  || '30+');
+  set('hs-years',    heroStatsCache.years    || '3+');
+  hsPreview();
+}
+
+window.hsPreview = function() {
+  const p = document.getElementById('hs-projects')?.value || '50+';
+  const c = document.getElementById('hs-clients')?.value  || '30+';
+  const y = document.getElementById('hs-years')?.value    || '3+';
+  const setEl = (id,v) => { const el=document.getElementById(id); if(el) el.textContent=v; };
+  setEl('hs-prev-projects', p);
+  setEl('hs-prev-clients',  c);
+  setEl('hs-prev-years',    y);
+  // Code block preview (numbers only)
+  setEl('hs-code-projects', p.replace(/[^0-9]/g,''));
+  setEl('hs-code-years',    y.replace(/[^0-9]/g,''));
+};
+
+window.saveHeroStats = async function() {
+  const _db = window.__db;
+  if (!_db) { toast('Database not ready','error'); return; }
+  const projects = document.getElementById('hs-projects')?.value?.trim() || '50+';
+  const clients  = document.getElementById('hs-clients')?.value?.trim()  || '30+';
+  const years    = document.getElementById('hs-years')?.value?.trim()    || '3+';
+  try {
+    const { doc, setDoc, serverTimestamp } = window.__fbModules;
+    await setDoc(doc(_db,'settings','heroStats'), {
+      projects, clients, years,
+      updatedAt: serverTimestamp(),
+      updatedBy: window.currentUser?.email || 'admin'
+    });
+    heroStatsCache = { projects, clients, years };
+    toast('Hero stats updated on live website ⚡', 'success');
+  } catch(e) { toast('Error: '+e.message,'error'); }
+};
 
 /* ══════════════════════════════════════
    STUDIO STATUS MANAGEMENT
