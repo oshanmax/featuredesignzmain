@@ -1252,12 +1252,15 @@ async function doForm(e){
       messagingSenderId:"307853117381",
       appId:"1:307853117381:web:fe3cab5e9ef0667d98edac"
     };
-    const app = getApps().length ? getApps()[0] : initializeApp(cfg, 'frontend');
+    const appName = 'fd-form';
+    const app = getApps().find(a=>a.name===appName) || initializeApp(cfg, appName);
     const db = getFirestore(app);
     await addDoc(collection(db,'messages'), {
-      name,email,service,budget,detail,
+      name, email, service, budget,
+      message: detail,
       date: serverTimestamp(),
-      read:false,replied:false,reply:'',replyDate:null
+      read: false, replied: false, reply: '', replyDate: null,
+      source: 'website'
     });
     saved = true;
   } catch(err) {

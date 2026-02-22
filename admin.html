@@ -359,7 +359,7 @@ window.renderMessages = function(q = '') {
         ${m.service ? `<span class="badge b-blue">📋 ${esc(m.service)}</span>` : ''}
         ${m.budget  ? `<span class="badge b-gold">💰 ${esc(m.budget)}</span>`  : ''}
       </div>
-      <div class="mc-body">${esc(m.detail || '(No message)')}</div>
+      <div class="mc-body">${esc(m.message || m.detail || '(No message)')}</div>
       ${m.replied && m.reply ? `
         <div class="reply-box">
           <div class="reply-lbl">
@@ -2448,20 +2448,39 @@ function renderStudioBadge(status, customLabel) {
 }
 
 function updateStudioOptHighlight(status) {
+  const COLS = {
+    available:   { border:'rgba(62,240,184,.6)',  bg:'rgba(62,240,184,.1)',  shadow:'0 8px 28px rgba(62,240,184,.2)'  },
+    unavailable: { border:'rgba(248,113,113,.6)', bg:'rgba(248,113,113,.1)', shadow:'0 8px 28px rgba(248,113,113,.2)' },
+    limited:     { border:'rgba(245,200,66,.6)',  bg:'rgba(245,200,66,.1)',  shadow:'0 8px 28px rgba(245,200,66,.2)'  },
+    custom:      { border:'rgba(82,130,255,.6)',  bg:'rgba(82,130,255,.08)', shadow:'0 8px 28px rgba(82,130,255,.2)'  },
+  };
   ['available','unavailable','limited','custom'].forEach(k => {
     const el = document.getElementById('sopt-' + k);
     if (!el) return;
-    const s = STUDIO_STATUSES[k] || { border: 'var(--bdr)', color: 'var(--blue)' };
+    const c = COLS[k];
     if (k === status) {
-      el.style.borderColor  = k === 'custom' ? 'rgba(82,130,255,.5)' : s.border || s.color;
-      el.style.background   = k === 'custom' ? 'rgba(82,130,255,.06)' : (s.bg || 'rgba(82,130,255,.06)');
-      el.style.transform    = 'translateY(-3px)';
-      el.style.boxShadow    = '0 8px 24px rgba(0,0,0,.3)';
+      el.style.borderColor = c.border;
+      el.style.background  = c.bg;
+      el.style.transform   = 'translateY(-4px) scale(1.01)';
+      el.style.boxShadow   = c.shadow;
+      el.style.borderWidth = '2px';
+      // Add checkmark overlay
+      if (!el.querySelector('.sopt-check')) {
+        const chk = document.createElement('div');
+        chk.className = 'sopt-check';
+        chk.innerHTML = '<span style="position:absolute;top:10px;right:12px;font-size:.7rem;font-family:JetBrains Mono,monospace;letter-spacing:.1em;color:' + c.border + ';background:rgba(0,0,0,.5);padding:2px 8px;border:1px solid ' + c.border + '">● ACTIVE</span>';
+        chk.style.cssText = 'position:absolute;inset:0;pointer-events:none';
+        el.style.position = 'relative';
+        el.appendChild(chk);
+      }
     } else {
-      el.style.borderColor  = 'var(--bdr)';
-      el.style.background   = 'var(--bg2)';
-      el.style.transform    = '';
-      el.style.boxShadow    = '';
+      el.style.borderColor = 'var(--bdr)';
+      el.style.background  = 'var(--bg2)';
+      el.style.transform   = '';
+      el.style.boxShadow   = '';
+      el.style.borderWidth = '2px';
+      const chk = el.querySelector('.sopt-check');
+      if (chk) chk.remove();
     }
   });
 }
@@ -2508,7 +2527,8 @@ window.saveCustomStudioStatus = async function() {
 };
 
 function renderStudioPage() {
-  // Already rendered via subscription
+  // Force re-apply highlight when page opens
+  updateStudioOptHighlight(studioStatusCache || 'available');
 }
 
 /* ══════════════════════════════════════
