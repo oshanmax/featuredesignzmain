@@ -567,7 +567,7 @@ function projCard(p, type) {
 window.openProjModal = function(id = null) {
   pEditId = id;
   document.getElementById('pm-title').textContent = id ? 'Edit Project' : 'Add New Project';
-  ['pe-name','pe-desc','pe-tags','pe-url','pe-github','pe-image','pe-emoji','pe-client','pe-notes'].forEach(i => {
+  ['pe-name','pe-desc','pe-tags','pe-url','pe-github','pe-image','pe-screenshots','pe-video','pe-emoji','pe-client','pe-notes'].forEach(i => {
     const el = document.getElementById(i); if (el) el.value = '';
   });
   const dispChk = document.getElementById('pe-display');
@@ -594,8 +594,12 @@ window.openProjModal = function(id = null) {
       document.getElementById('pe-status').value  = x.status || 'inprogress';
       document.getElementById('pe-progress').value = x.progress || 0;
       document.getElementById('pe-prog-val').textContent = (x.progress || 0) + '%';
-      document.getElementById('pe-client').value  = x.client || '';
-      document.getElementById('pe-notes').value   = x.notes || '';
+      document.getElementById('pe-client').value       = x.client   || '';
+      document.getElementById('pe-notes').value          = x.notes    || '';
+      const ssEl = document.getElementById('pe-screenshots');
+      if (ssEl) ssEl.value = (x.screenshots||[]).join('\n');
+      const vidEl = document.getElementById('pe-video');
+      if (vidEl) vidEl.value = x.videoUrl || '';
       const dc = document.getElementById('pe-display');
       const disp = x.display !== false;
       if (dc) { dc.checked = disp; updateDisplayToggle(disp); }
@@ -626,7 +630,10 @@ window.saveProject = async function() {
 
   if (!name || !cat || !desc) { toast('Fill required fields', 'error'); return; }
 
-  const data = { name, cat, desc, tags, url, githubUrl, imageUrl, emoji, status, progress, client, notes, display, hideStatus, updatedAt: serverTimestamp() };
+  const screenshotsRaw = document.getElementById('pe-screenshots').value || '';
+  const screenshots = screenshotsRaw.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,10);
+  const videoUrl    = document.getElementById('pe-video').value.trim();
+  const data = { name, cat, desc, tags, url, githubUrl, imageUrl, screenshots, videoUrl, emoji, status, progress, client, notes, display, hideStatus, updatedAt: serverTimestamp() };
 
   try {
     if (pEditId) {
@@ -1879,9 +1886,20 @@ tr:hover td{background:rgba(82,130,255,.03)}
         <div class="fg"><label class="fl">Live URL (optional)</label><input class="fi" id="pe-url" type="url" placeholder="https://..."></div>
         <div class="fg"><label class="fl">GitHub URL (optional)</label><input class="fi" id="pe-github" type="url" placeholder="https://github.com/..."></div>
       </div>
-      <div class="fg"><label class="fl">Project Image URL (optional — leave blank to use emoji)</label>
+      <div class="fg"><label class="fl">Thumbnail Image URL <span style="color:var(--txt3);font-weight:400">(main card image)</span></label>
         <input class="fi" id="pe-image" type="url" placeholder="https://... (direct image link, or leave blank)">
-        <div style="font-family:'JetBrains Mono',monospace;font-size:.57rem;color:var(--txt3);margin-top:3px">Upload image to Firebase Storage / Imgur / any host → paste URL here</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:.57rem;color:var(--txt3);margin-top:3px">Upload to <strong>Imgur.com</strong> or <strong>imgbb.com</strong> → right-click image → Copy image address</div>
+      </div>
+
+      <div class="fg">
+        <label class="fl">Screenshots / Gallery <span style="color:var(--txt3);font-weight:400">(one URL per line, up to 10)</span></label>
+        <textarea class="fta" id="pe-screenshots" rows="4" placeholder="https://i.imgur.com/abc.jpg&#10;https://i.imgur.com/def.jpg&#10;https://i.imgur.com/ghi.jpg"></textarea>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:.57rem;color:var(--txt3);margin-top:3px">Visitors see these in a slideshow when they click the project card</div>
+      </div>
+
+      <div class="fg"><label class="fl">Demo Video URL <span style="color:var(--txt3);font-weight:400">(optional)</span></label>
+        <input class="fi" id="pe-video" type="url" placeholder="https://www.youtube.com/embed/VIDEO_ID  or  direct .mp4 link">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:.57rem;color:var(--txt3);margin-top:3px">YouTube: share → embed → copy src URL. Shows in project detail popup.</div>
       </div>
 
       <!-- PROGRESS SLIDER -->
