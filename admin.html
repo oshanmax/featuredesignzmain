@@ -88,13 +88,14 @@ function clearSession() {
    AUTH STATE
 ══════════════════════════════════════ */
 onAuthStateChanged(auth, async user => {
-  if (user && checkSession()) {
+  if (user) {
+    // Set/refresh session on every valid auth
+    setSession(user.uid);
     currentUser = user;
     const role = await getUserRole(user.uid, user.email);
     currentRole = role;
 
     if (!role) {
-      // Not approved yet
       showScreen('pendingScreen');
       document.getElementById('pending-email').textContent = user.email;
       return;
@@ -103,12 +104,14 @@ onAuthStateChanged(auth, async user => {
       showScreen('rejectedScreen');
       return;
     }
-    // Approved — show app
     showScreen('appScreen');
     initApp(user, role);
   } else {
-    if (user && !checkSession()) {
-      await signOut(auth);
+    // Check if we have a stored session that expired
+    const s = JSON.parse(localStorage.getItem('fd_session') || 'null');
+    if (s) {
+      const days = (Date.now() - s.ts) / (1000 * 60 * 60 * 24);
+      if (days >= SESSION_DAYS) localStorage.removeItem('fd_session');
     }
     showScreen('loginScreen');
   }

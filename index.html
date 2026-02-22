@@ -3,9 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Feature Designz — Creative Studio in Sri Lanka. Web Development, Mobile Apps, Graphic Design & Video Editing.">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<link rel="dns-prefetch" href="https://www.gstatic.com">
+<link rel="dns-prefetch" href="https://firestore.googleapis.com">
 <title>Feature Designz — We Bring Ideas to Life</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,600;12..96,700;12..96,800&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'"
+  href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
 <style>
 :root{
   --bg0:#020510;
@@ -629,6 +637,8 @@ footer{background:var(--bg1);border-top:1px solid var(--bdr);padding:56px 60px 3
 /* ── PROJECT DETAIL MODAL ── */
 @keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
 @keyframes gearSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+#maint-gear-icon,#gear-outer{will-change:transform}
+.ai-spinner{will-change:transform}
 @keyframes ringPulse{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:.8;transform:scale(1.08)}}
 @keyframes dotBounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-10px)}}
 #pdModal .ptag{background:rgba(82,130,255,.12);border:1px solid rgba(82,130,255,.2);color:var(--blue2);font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.1em;padding:3px 10px}
@@ -692,6 +702,16 @@ footer{background:var(--bg1);border-top:1px solid var(--bdr);padding:56px 60px 3
 }
 .nc-timer.urgent{ color:var(--red); }
 .nc-timer.soon  { color:var(--gold); }
+
+/* ── PERFORMANCE ── */
+.pcard{contain:layout}
+.sec{contain:layout style}
+.notice-card{contain:layout}
+img{content-visibility:auto}
+.pcard-thumb img{will-change:auto}
+.hero-code,.hero-terminal{contain:strict}
+/* reduce paint for static sections */
+footer{contain:layout style}
 
 /* ── RESPONSIVE ── */
 @media(max-width:1100px){
@@ -1563,8 +1583,8 @@ const STUDIO_MAP = {
 
 function fdEsc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-// ── UNIFIED FIREBASE LOADER ─────────
-(async function initFrontendFirebase() {
+// ── UNIFIED FIREBASE LOADER (deferred) ─────
+const _runFirebase = async function initFrontendFirebase() {
   try {
     const { initializeApp }  = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
     const { getFirestore, doc, collection, query, orderBy, onSnapshot }
@@ -1635,7 +1655,13 @@ function fdEsc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;
     console.warn('Firebase init error:', e.message);
     renderProjectGrid([]); // show empty state
   }
-})();
+};
+// Defer Firebase — improves initial page load speed
+if ('requestIdleCallback' in window) {
+  requestIdleCallback(_runFirebase, { timeout: 2500 });
+} else {
+  setTimeout(_runFirebase, 100);
+}
 
 // ── PROJECT GRID ─────────────────────
 const CAT_LABEL = { web:'Web Dev', mobile:'Mobile App', design:'Graphics Design', video:'Video Editing' };
