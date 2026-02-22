@@ -245,6 +245,7 @@ function initApp(user, role) {
   loadYoutubeSettings();
   subscribeSocial();
   subscribeStudioStatus();
+  loadAiSettings();
   if (role === 'main_admin') subscribeAdmins();
 
   // Show dashboard
@@ -369,6 +370,9 @@ window.renderMessages = function(q = '') {
         </div>` : ''}
       <div class="mc-actions">
         ${!m.read ? `<button class="btn btn-ghost btn-sm" onclick="markRead('${m.id}')">✓ Mark Read</button>` : ''}
+        <button class="btn btn-ai btn-sm" onclick="openAiReply('${m.id}')">
+          ✦ AI Reply
+        </button>
         <button class="btn btn-gmail btn-sm" onclick="openGmail('${m.id}')">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 010 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg>
           ${m.replied ? 'Re-reply via Gmail' : 'Reply via Gmail'}
@@ -502,7 +506,7 @@ window.renderProjects = function(q = '', catF = '') {
 function renderProjectsSection() {
   const completed   = projectsCache.filter(p => p.status === 'completed' || (p.progress || 0) >= 100);
   const inProgress  = projectsCache.filter(p => p.status === 'inprogress' || ((p.progress || 0) < 100 && !['completed','update_soon','paused','off'].includes(p.status)));
-  const updateSoon  = projectsCache.filter(p => p.status === 'update_soon');
+  const updateSoon  = projectsCache.filter(p => ['update_soon','uploading_soon','updating','updated'].includes(p.status));
   const offProjs    = projectsCache.filter(p => p.status === 'off');
 
   const cEl  = document.getElementById('ps-completed');
@@ -821,8 +825,10 @@ const catB = { web:'b-blue', mobile:'b-cyan', design:'b-gold', video:'b-pink' };
 function statusBadge(status, progress = 0) {
   const pct = parseInt(progress) || 0;
   if (status === 'off')         return '<span class="badge b-red">🚫 Off</span>';
-  if (status === 'update_soon') return '<span class="badge b-cyan">🔄 Update Soon</span>';
-  if (status === 'updating')    return '<span class="badge b-blue">⚡ Updating</span>';
+  if (status === 'update_soon')    return '<span class="badge b-cyan">🔄 Update Soon</span>';
+  if (status === 'uploading_soon') return '<span class="badge b-gold">📤 Uploading Soon</span>';
+  if (status === 'updating')       return '<span class="badge b-blue">⚡ Updating</span>';
+  if (status === 'updated')        return '<span class="badge b-mint">✨ Updated</span>';
   if (status === 'paused')      return '<span class="badge b-grey">⏸ Paused</span>';
   if (status === 'inprogress')  return '<span class="badge b-blue">⟳ In Progress</span>';
   if (status === 'completed' || pct >= 100) return '<span class="badge b-mint">✓ Completed</span>';
@@ -997,6 +1003,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9000;
 .btn-danger:hover{background:var(--red);color:white}
 .btn-success{background:transparent;color:var(--mint);border:1px solid rgba(62,240,184,.3)}
 .btn-success:hover{background:var(--mint);color:#020510}
+.btn-ai{background:linear-gradient(135deg,rgba(82,130,255,.25),rgba(56,217,245,.2));border:1px solid rgba(82,130,255,.5);color:var(--blue2);font-weight:600}
+.btn-ai:hover{background:linear-gradient(135deg,rgba(82,130,255,.4),rgba(56,217,245,.3))}
 .btn-gmail{background:#ea4335;color:white}
 .btn-gmail:hover{opacity:.9;box-shadow:0 6px 20px rgba(234,67,53,.35)}
 .btn-sm{padding:5px 12px;font-size:.74rem}
@@ -1081,6 +1089,12 @@ tr:hover td{background:rgba(82,130,255,.03)}
 .modal-bg{position:fixed;inset:0;background:rgba(2,5,16,.9);z-index:500;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s}
 .modal-bg.open{opacity:1;pointer-events:all}
 .modal{background:var(--bg2);border:1px solid var(--bdr2);width:100%;max-width:620px;max-height:92vh;overflow-y:auto;position:relative}
+/* AI Modal */
+.ai-tone-btn{font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.08em;padding:6px 14px;background:transparent;border:1px solid var(--bdr2);color:var(--txt3);cursor:pointer;transition:all .2s}
+.ai-tone-btn:hover{border-color:var(--blue);color:var(--blue2)}
+.ai-tone-btn.active{background:rgba(82,130,255,.15);border-color:var(--blue);color:var(--blue2)}
+.ai-spinner{width:14px;height:14px;border:2px solid rgba(82,130,255,.3);border-top-color:var(--blue2);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
 .modal::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--blue),var(--cyan),var(--mint))}
 .mh{padding:20px 24px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between}
 .mh-title{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:1.05rem}
@@ -1781,8 +1795,58 @@ tr:hover td{background:rgba(82,130,255,.03)}
             </div>
           </div>
         </div>
-      </div>
 
+        <!-- AI ASSISTANT SETTINGS -->
+        <div class="sp" style="border-color:rgba(82,130,255,.3);background:rgba(82,130,255,.04)">
+          <div class="sp-title" style="color:var(--blue2)">✦ AI Auto-Reply Assistant</div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg3);border:1px solid var(--bdr);padding:13px 16px;margin-bottom:14px">
+            <div>
+              <div class="fl" style="margin-bottom:3px">Enable AI Auto-Reply</div>
+              <div style="font-size:.76rem;color:var(--txt3)">Show "✦ AI Reply" button on messages</div>
+            </div>
+            <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer">
+              <input type="checkbox" id="ai-enabled-chk" checked onchange="saveAiSettings()" style="opacity:0;width:0;height:0">
+              <span id="ai-enabled-track" style="position:absolute;inset:0;background:rgba(62,240,184,.2);border:1px solid rgba(62,240,184,.4);transition:.3s">
+                <span id="ai-enabled-thumb" style="position:absolute;top:3px;left:3px;width:16px;height:16px;background:var(--mint);transform:translateX(20px);transition:.3s"></span>
+              </span>
+            </label>
+          </div>
+
+          <div class="fg">
+            <label class="fl">Business Name</label>
+            <input class="fi" id="ai-biz-name" type="text" value="Feature Designz" placeholder="Feature Designz">
+          </div>
+
+          <div class="fg">
+            <label class="fl">Services Offered (comma separated)</label>
+            <input class="fi" id="ai-services" type="text" value="Web Development, Mobile App Development, Graphic Design, Video Editing" placeholder="Web Dev, Mobile Apps...">
+          </div>
+
+          <div class="fg">
+            <label class="fl">Custom Assistant Instructions</label>
+            <textarea class="fta" id="ai-instructions" rows="4" placeholder="e.g. Always mention our portfolio, offer a free consultation, keep replies under 150 words...">Always be professional and helpful. Mention that we offer a free consultation. Sign off as the Feature Designz team.</textarea>
+          </div>
+
+          <div class="fg">
+            <label class="fl">Default Reply Tone</label>
+            <select class="fsel2" id="ai-default-tone">
+              <option value="professional">💼 Professional</option>
+              <option value="friendly">😊 Friendly</option>
+              <option value="formal">📜 Formal</option>
+              <option value="brief">⚡ Brief</option>
+            </select>
+          </div>
+
+          <div style="background:var(--bg3);border:1px solid var(--bdr);padding:12px 14px;margin-bottom:14px">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:.55rem;letter-spacing:.16em;color:var(--txt3);margin-bottom:7px;text-transform:uppercase">Preview System Prompt</div>
+            <div id="ai-prompt-preview" style="font-size:.76rem;color:var(--txt2);line-height:1.8;white-space:pre-wrap"></div>
+          </div>
+
+          <button class="btn btn-primary" onclick="saveAiSettings()" style="width:100%;justify-content:center">⚡ Save Assistant Settings</button>
+        </div>
+
+      </div>
     </div>
   </div>
 </div>
@@ -1859,7 +1923,9 @@ tr:hover td{background:rgba(82,130,255,.03)}
           <option value="completed">✓ Completed</option>
           <option value="inprogress">⟳ In Progress</option>
           <option value="update_soon">🔄 Update Soon</option>
+          <option value="uploading_soon">📤 Uploading Soon</option>
           <option value="updating">⚡ Updating</option>
+          <option value="updated">✨ Updated</option>
           <option value="paused">⏸ Paused</option>
           <option value="off">🚫 Off (Hidden)</option>
         </select>
@@ -2269,9 +2335,11 @@ function renderWsProjects() {
             onchange="quickChangeStatus('${p.id}',this.value)">
             <option value="completed"   ${p.status==='completed'  ?'selected':''}>✓ Completed</option>
             <option value="inprogress"  ${p.status==='inprogress' ?'selected':''}>⟳ In Progress</option>
-            <option value="update_soon" ${p.status==='update_soon'?'selected':''}>🔄 Update Soon</option>
-            <option value="updating"    ${p.status==='updating'   ?'selected':''}>⚡ Updating</option>
-            <option value="paused"      ${p.status==='paused'     ?'selected':''}>⏸ Paused</option>
+            <option value="update_soon"    ${p.status==='update_soon'   ?'selected':''}>🔄 Update Soon</option>
+            <option value="uploading_soon" ${p.status==='uploading_soon'?'selected':''}>📤 Uploading Soon</option>
+            <option value="updating"       ${p.status==='updating'      ?'selected':''}>⚡ Updating</option>
+            <option value="updated"        ${p.status==='updated'       ?'selected':''}>✨ Updated</option>
+            <option value="paused"         ${p.status==='paused'        ?'selected':''}>⏸ Paused</option>
             <option value="off"         ${p.status==='off'        ?'selected':''}>🚫 Off</option>
           </select>
           <div style="display:flex;gap:5px">
@@ -2443,6 +2511,251 @@ function renderStudioPage() {
   // Already rendered via subscription
 }
 
+/* ══════════════════════════════════════
+   AI AUTO-REPLY ASSISTANT
+══════════════════════════════════════ */
+let aiMsgId    = null;
+let aiTone     = 'professional';
+let aiSettings = {};
+
+// Load AI settings from Firestore
+function loadAiSettings() {
+  const _db = window.__db;
+  if (!_db) { setTimeout(loadAiSettings, 600); return; }
+  const { doc, onSnapshot } = window.__fbModules;
+  onSnapshot(doc(_db, 'settings', 'assistant'), snap => {
+    if (snap.exists()) {
+      aiSettings = snap.data();
+      populateAiSettingsForm();
+    }
+    updateAiPromptPreview();
+  });
+}
+
+function populateAiSettingsForm() {
+  const set = (id, val) => { const el=document.getElementById(id); if(el&&val!==undefined) el.value=val; };
+  const chk = document.getElementById('ai-enabled-chk');
+  if (chk) {
+    chk.checked = aiSettings.enabled !== false;
+    updateAiToggleUI(chk.checked);
+  }
+  set('ai-biz-name',    aiSettings.bizName    || 'Feature Designz');
+  set('ai-services',    aiSettings.services   || 'Web Development, Mobile App Development, Graphic Design, Video Editing');
+  set('ai-instructions',aiSettings.instructions|| 'Always be professional and helpful. Mention that we offer a free consultation. Sign off as the Feature Designz team.');
+  set('ai-default-tone',aiSettings.defaultTone || 'professional');
+  updateAiPromptPreview();
+}
+
+function updateAiToggleUI(enabled) {
+  const track = document.getElementById('ai-enabled-track');
+  const thumb = document.getElementById('ai-enabled-thumb');
+  if (!track||!thumb) return;
+  track.style.background  = enabled ? 'rgba(62,240,184,.2)' : 'var(--bg4)';
+  track.style.borderColor = enabled ? 'rgba(62,240,184,.4)' : 'rgba(74,88,128,.3)';
+  thumb.style.background  = enabled ? 'var(--mint)' : 'var(--txt3)';
+  thumb.style.transform   = enabled ? 'translateX(20px)' : 'translateX(0)';
+}
+
+function buildSystemPrompt() {
+  const biz  = document.getElementById('ai-biz-name')?.value    || aiSettings.bizName    || 'Feature Designz';
+  const svcs = document.getElementById('ai-services')?.value    || aiSettings.services   || 'Web Development, Graphic Design';
+  const inst = document.getElementById('ai-instructions')?.value|| aiSettings.instructions|| '';
+  return `You are a professional customer service assistant for ${biz}, a digital agency that offers: ${svcs}.
+
+Your job is to write a reply email to a client inquiry. Be helpful, professional, and concise.
+
+${inst}
+
+Rules:
+- Reply in the same language the client used
+- Do NOT include subject lines or "To:" headers — just the email body
+- Sign off as "The ${biz} Team"
+- Keep the reply focused and under 200 words unless the inquiry requires more detail`;
+}
+
+function updateAiPromptPreview() {
+  const el = document.getElementById('ai-prompt-preview');
+  if (el) el.textContent = buildSystemPrompt();
+}
+
+// Wire up live preview updates
+['ai-biz-name','ai-services','ai-instructions'].forEach(id => {
+  document.addEventListener('DOMContentLoaded', () => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', updateAiPromptPreview);
+  });
+});
+
+window.saveAiSettings = async function() {
+  const _db = window.__db;
+  if (!_db) { toast('Database not ready','error'); return; }
+  const enabled  = document.getElementById('ai-enabled-chk')?.checked !== false;
+  const bizName  = document.getElementById('ai-biz-name')?.value?.trim()     || 'Feature Designz';
+  const services = document.getElementById('ai-services')?.value?.trim()     || '';
+  const instructions = document.getElementById('ai-instructions')?.value?.trim() || '';
+  const defaultTone  = document.getElementById('ai-default-tone')?.value     || 'professional';
+  updateAiToggleUI(enabled);
+  try {
+    const { doc, setDoc, serverTimestamp } = window.__fbModules;
+    await setDoc(doc(_db,'settings','assistant'), {
+      enabled, bizName, services, instructions, defaultTone,
+      updatedAt: serverTimestamp()
+    });
+    aiSettings = { enabled, bizName, services, instructions, defaultTone };
+    updateAiPromptPreview();
+    toast('AI Assistant settings saved ✓', 'success');
+  } catch(e) { toast('Error: '+e.message,'error'); }
+};
+
+// ── MODAL OPEN / CLOSE ────────────────
+window.openAiReply = function(msgId) {
+  if (aiSettings.enabled === false) {
+    toast('AI Assistant is disabled — enable in Settings','error'); return;
+  }
+  const m = messagesCache.find(x => x.id === msgId);
+  if (!m) return;
+  aiMsgId = msgId;
+  aiTone  = aiSettings.defaultTone || 'professional';
+
+  // Populate client info
+  document.getElementById('ai-client-name').textContent  = m.name  || 'Client';
+  document.getElementById('ai-client-email').textContent = m.email || '';
+  document.getElementById('ai-client-msg').textContent   = m.message || '';
+
+  // Reset state
+  document.getElementById('ai-reply-text').value = '';
+  document.getElementById('ai-send-btn').disabled = true;
+  document.getElementById('ai-regen-btn').style.display = 'none';
+
+  // Set active tone btn
+  document.querySelectorAll('.ai-tone-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tone === aiTone);
+  });
+
+  // Show modal
+  document.getElementById('ai-modal-overlay').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+
+  // Auto-generate
+  generateAiReply(m);
+};
+
+window.closeAiModal = function() {
+  document.getElementById('ai-modal-overlay').style.display = 'none';
+  document.body.style.overflow = '';
+  aiMsgId = null;
+};
+
+// ── TONE SELECTOR ────────────────────
+window.selectTone = function(btn, tone) {
+  document.querySelectorAll('.ai-tone-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  aiTone = tone;
+  // Regenerate with new tone
+  const m = messagesCache.find(x => x.id === aiMsgId);
+  if (m) generateAiReply(m);
+};
+
+// ── GENERATE ─────────────────────────
+async function generateAiReply(m) {
+  const statusBar = document.getElementById('ai-status-bar');
+  const statusTxt = document.getElementById('ai-status-txt');
+  const replyTxt  = document.getElementById('ai-reply-text');
+  const sendBtn   = document.getElementById('ai-send-btn');
+  const regenBtn  = document.getElementById('ai-regen-btn');
+
+  statusBar.style.display = 'flex';
+  statusTxt.textContent   = 'Generating reply...';
+  replyTxt.value          = '';
+  sendBtn.disabled        = true;
+  regenBtn.style.display  = 'none';
+
+  const toneMap = {
+    professional: 'professional and concise',
+    friendly:     'warm, friendly, and approachable',
+    formal:       'formal and detailed',
+    brief:        'very brief and to the point (max 80 words)'
+  };
+
+  const userPrompt = `Client name: ${m.name || 'Client'}
+Client email: ${m.email || ''}
+Service interested in: ${m.service || 'General inquiry'}
+Their message: "${m.message || ''}"
+
+Write a ${toneMap[aiTone]||'professional'} reply email to this client.`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: buildSystemPrompt(),
+        messages: [{ role: 'user', content: userPrompt }]
+      })
+    });
+
+    const data = await response.json();
+    const text = data.content?.[0]?.text || '';
+
+    if (!text) throw new Error(data.error?.message || 'No reply generated');
+
+    replyTxt.value         = text.trim();
+    statusBar.style.display= 'none';
+    sendBtn.disabled       = false;
+    regenBtn.style.display = 'inline-flex';
+
+  } catch(e) {
+    statusTxt.textContent = '✕ Error: ' + e.message;
+    statusBar.style.background = 'rgba(248,113,113,.08)';
+    statusBar.style.borderColor= 'rgba(248,113,113,.25)';
+    statusBar.style.color      = 'var(--red)';
+    // Remove spinner
+    const spinner = statusBar.querySelector('.ai-spinner');
+    if (spinner) spinner.style.display = 'none';
+  }
+}
+
+window.regenerateAiReply = function() {
+  const m = messagesCache.find(x => x.id === aiMsgId);
+  if (m) generateAiReply(m);
+};
+
+// ── COPY ─────────────────────────────
+window.copyAiReply = function() {
+  const txt = document.getElementById('ai-reply-text')?.value;
+  if (!txt) { toast('No reply to copy','error'); return; }
+  navigator.clipboard.writeText(txt).then(() => toast('Copied to clipboard ✓','success'));
+};
+
+// ── SEND VIA GMAIL ───────────────────
+window.sendAiViaGmail = function() {
+  const reply = document.getElementById('ai-reply-text')?.value?.trim();
+  const m = messagesCache.find(x => x.id === aiMsgId);
+  if (!m || !reply) { toast('No reply generated','error'); return; }
+
+  const to      = encodeURIComponent(m.email || '');
+  const subject = encodeURIComponent('Re: Your ' + (m.service||'Feature Designz') + ' Inquiry');
+  const body    = encodeURIComponent(reply);
+  window.open(`https://mail.google.com/mail/?view=cm&to=${to}&su=${subject}&body=${body}`, '_blank');
+
+  // Save reply to Firestore
+  const _db = window.__db;
+  if (_db) {
+    const { doc, updateDoc, serverTimestamp } = window.__fbModules;
+    updateDoc(doc(_db,'messages',aiMsgId), {
+      replied:   true,
+      reply:     reply,
+      replyDate: serverTimestamp(),
+      replyType: 'ai'
+    }).catch(()=>{});
+  }
+
+  toast('Opening Gmail with AI reply ✓', 'success');
+  closeAiModal();
+};
+
 // Update settings page on open
 document.addEventListener('DOMContentLoaded', () => {
   const emailEl = document.getElementById('qs-email');
@@ -2451,5 +2764,61 @@ document.addEventListener('DOMContentLoaded', () => {
   if (roleEl  && window.currentRole) roleEl.textContent  = window.currentRole === 'main_admin' ? '★ Main Admin' : 'Admin';
 });
 </script>
+  <!-- AI REPLY MODAL -->
+  <div class="modal-overlay" id="ai-modal-overlay" style="display:none" onclick="if(event.target===this)closeAiModal()">
+    <div class="modal" id="ai-modal" style="width:680px;max-width:95vw;max-height:90vh;overflow-y:auto">
+      <div class="modal-header">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:1.4rem">✦</span>
+          <div class="modal-title">AI Auto-Reply Assistant</div>
+        </div>
+        <button class="modal-close" onclick="closeAiModal()">✕</button>
+      </div>
+
+      <!-- Client message preview -->
+      <div style="background:var(--bg3);border:1px solid var(--bdr);padding:14px;margin-bottom:16px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:.55rem;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3);margin-bottom:8px">Client Message</div>
+        <div id="ai-client-name"  style="font-weight:700;font-size:.9rem;margin-bottom:3px"></div>
+        <div id="ai-client-email" style="font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--txt3);margin-bottom:8px"></div>
+        <div id="ai-client-msg"   style="font-size:.85rem;color:var(--txt2);line-height:1.7"></div>
+      </div>
+
+      <!-- AI Status -->
+      <div id="ai-status-bar" style="display:none;background:rgba(82,130,255,.08);border:1px solid rgba(82,130,255,.2);padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;font-size:.8rem;color:var(--blue2)">
+        <div class="ai-spinner"></div>
+        <span id="ai-status-txt">Generating reply...</span>
+      </div>
+
+      <!-- Generated reply -->
+      <div class="fg">
+        <label class="fl" style="display:flex;align-items:center;justify-content:space-between">
+          <span>AI Generated Reply</span>
+          <button class="btn btn-ghost btn-sm" onclick="regenerateAiReply()" id="ai-regen-btn" style="display:none">↺ Regenerate</button>
+        </label>
+        <textarea class="fta" id="ai-reply-text" rows="8" placeholder="AI reply will appear here..." style="font-size:.84rem;line-height:1.7"></textarea>
+      </div>
+
+      <!-- Tone selector -->
+      <div class="fg" style="margin-top:10px">
+        <label class="fl">Reply Tone</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap" id="ai-tone-btns">
+          <button class="ai-tone-btn active" data-tone="professional" onclick="selectTone(this,'professional')">💼 Professional</button>
+          <button class="ai-tone-btn" data-tone="friendly" onclick="selectTone(this,'friendly')">😊 Friendly</button>
+          <button class="ai-tone-btn" data-tone="formal" onclick="selectTone(this,'formal')">📜 Formal</button>
+          <button class="ai-tone-btn" data-tone="brief" onclick="selectTone(this,'brief')">⚡ Brief</button>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="margin-top:16px">
+        <button class="btn btn-ghost" onclick="closeAiModal()">Cancel</button>
+        <button class="btn btn-ghost" onclick="copyAiReply()">📋 Copy</button>
+        <button class="btn btn-primary" onclick="sendAiViaGmail()" id="ai-send-btn" disabled>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 010 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg>
+          Send via Gmail
+        </button>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
