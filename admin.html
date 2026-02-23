@@ -1593,8 +1593,6 @@ tr:hover td{background:rgba(82,130,255,.03)}
       </div>
 
 
-      </div>
-
       <!-- MAINTENANCE MODE -->
       <div class="page" id="page-maintenance">
         <div class="ph">
@@ -2007,6 +2005,10 @@ tr:hover td{background:rgba(82,130,255,.03)}
 
         </div>
       
+
+      </div>
+
+
       <!-- POPUP MESSAGE PAGE -->
       <div class="page" id="page-popup">
         <div class="ph">
@@ -2105,9 +2107,7 @@ tr:hover td{background:rgba(82,130,255,.03)}
         </div>
       </div>
 
-</div>
-
-      <!-- SETTINGS -->
+   <!-- SETTINGS -->
       <div class="page" id="page-settings">
         <div class="ph"><div class="ph-title">Admin <em>Settings</em></div></div>
         <div class="sg">
@@ -3613,7 +3613,7 @@ function subscribePopup() {
 }
 
 function renderPopupPage(data) {
-  if (!data) return;
+  data = data || {};
   const en = document.getElementById('popup-enabled');
   if (en) {
     en.checked = data.enabled === true;
@@ -3630,9 +3630,10 @@ function renderPopupPage(data) {
 
   const mt = data.mediaType || 'none';
   popupMediaType = mt;
-  document.querySelectorAll('#popup-media-type-btns .maint-type-btn').forEach(b => b.classList.remove('active'));
-  const activeBtn = document.querySelector('#popup-media-type-btns .maint-type-btn[onclick*="\'' + mt + '\'"]');
-  if (activeBtn) activeBtn.classList.add('active');
+  document.querySelectorAll('#popup-media-type-btns .maint-type-btn').forEach(b => {
+    b.classList.remove('active');
+    if (b.getAttribute('onclick') && b.getAttribute('onclick').includes("'" + mt + "'")) b.classList.add('active');
+  });
   const urlRow = document.getElementById('popup-media-url-row');
   if (urlRow) urlRow.style.display = mt !== 'none' ? 'block' : 'none';
   const mu = document.getElementById('popup-media-url');
