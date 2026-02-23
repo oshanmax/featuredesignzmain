@@ -113,8 +113,8 @@ nav{
 .hero{
   min-height:100vh;
   display:grid;grid-template-columns:1fr 1fr;
-  align-items:center;gap:0;
-  padding:80px 60px 60px;
+  align-items:flex-start;gap:0;
+  padding:120px 60px 60px;
   position:relative;overflow:hidden;
 }
 
@@ -136,13 +136,13 @@ nav{
 }
 
 /* left */
-.hero-l{position:relative;z-index:2}
+.hero-l{position:relative;z-index:2;display:flex;flex-direction:column}
 
 .hero-tag{
   display:inline-flex;align-items:center;gap:8px;
   font-family:'JetBrains Mono',monospace;font-size:.65rem;letter-spacing:.2em;text-transform:uppercase;
   color:var(--cyan);border:1px solid rgba(56,217,245,0.25);background:rgba(56,217,245,0.05);
-  padding:7px 16px;margin-bottom:28px;
+  padding:7px 16px;margin-bottom:20px;
   opacity:0;animation:up .6s .3s forwards;
 }
 .tag-dot{width:6px;height:6px;border-radius:50%;background:var(--cyan);animation:blink 1.8s ease infinite}
@@ -153,7 +153,7 @@ nav{
   font-weight:800;
   font-size:clamp(2.8rem,5.2vw,5.5rem);
   line-height:.97;letter-spacing:-.04em;
-  margin-bottom:22px;
+  margin-bottom:16px;
   opacity:0;animation:up .8s .5s forwards;
 }
 .hero-h1 .gr{
@@ -170,11 +170,12 @@ nav{
 /* code snippet decoration */
 .hero-code{
   font-family:'JetBrains Mono',monospace;font-size:.8rem;line-height:1.7;
-  color:var(--txt3);margin-bottom:32px;
-  padding:16px 20px;
+  color:var(--txt3);margin-bottom:24px;
+  padding:12px 16px;
   background:rgba(7,17,43,0.7);border:1px solid var(--bdr);
   border-left:3px solid var(--blue);
   opacity:0;animation:up .8s .7s forwards;
+  overflow-x:hidden;
 }
 .code-kw{color:var(--pink)}
 .code-fn{color:var(--blue2)}
@@ -205,6 +206,7 @@ nav{
 /* right — floating UI cards */
 .hero-r{
   position:relative;z-index:2;height:500px;
+  align-self:center;
   opacity:0;animation:fadeR .9s .7s forwards;
 }
 @keyframes fadeR{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
@@ -640,6 +642,59 @@ footer{background:var(--bg1);border-top:1px solid var(--bdr);padding:56px 60px 3
 .pd-dot.on{background:var(--blue2)}
 .pd-status-pill{display:inline-flex;align-items:center;gap:5px;font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.1em;padding:4px 12px}
 
+/* ── NOTICES ── */
+.notice-card{
+  background:var(--bg2);
+  border:1px solid var(--bdr);
+  padding:16px 18px;
+  position:relative;
+  transition:transform .2s,box-shadow .2s;
+  overflow:hidden;
+  animation:fadeUp .4s ease both;
+}
+.notice-card::before{
+  content:'';position:absolute;top:0;left:0;width:3px;height:100%;
+}
+.nc-new::before   { background:var(--mint); }
+.nc-update::before{ background:var(--blue2); }
+.nc-event::before { background:var(--gold); }
+.nc-video::before { background:#f87171; }
+.nc-info::before  { background:var(--txt3); }
+
+.notice-card:hover{ transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,.3); }
+
+.nc-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  font-family:'JetBrains Mono',monospace;font-size:.52rem;letter-spacing:.14em;text-transform:uppercase;
+  padding:3px 10px;margin-bottom:10px;
+}
+.nc-title{
+  font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:.98rem;
+  margin:0 0 7px;color:var(--txt);padding-right:24px;
+}
+.nc-body{
+  font-size:.82rem;color:var(--txt2);line-height:1.75;margin-bottom:12px;
+}
+.nc-link{
+  font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--blue2);text-decoration:none;display:inline-flex;align-items:center;gap:5px;
+  border-bottom:1px solid transparent;transition:border-color .2s;
+}
+.nc-link:hover{ border-bottom-color:var(--blue2); }
+.nc-dismiss{
+  position:absolute;top:10px;right:12px;background:transparent;border:none;
+  color:var(--txt3);cursor:pointer;font-size:.9rem;line-height:1;padding:2px 4px;
+  transition:color .2s;
+}
+.nc-dismiss:hover{ color:var(--txt); }
+.nc-timer{
+  font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.1em;
+  color:var(--txt3);margin-top:10px;display:flex;align-items:center;gap:5px;
+  border-top:1px solid var(--bdr);padding-top:9px;
+}
+.nc-timer.urgent{ color:var(--red); }
+.nc-timer.soon  { color:var(--gold); }
+
 /* ── RESPONSIVE ── */
 @media(max-width:1100px){
   .hero{grid-template-columns:1fr}
@@ -791,6 +846,24 @@ footer{background:var(--bg1);border-top:1px solid var(--bdr);padding:56px 60px 3
     <div class="mq-i">After Effects <span class="mq-star g">✦</span></div>
   </div>
 </div>
+
+<!-- NOTICES -->
+<section id="notices-section" style="display:none;padding:0;background:transparent">
+  <div style="max-width:1200px;margin:0 auto;padding:0 32px">
+
+    <div id="notices-header" style="display:flex;align-items:center;justify-content:space-between;padding:20px 0 12px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span id="notices-pulse-dot" style="width:8px;height:8px;border-radius:50%;background:var(--mint);display:inline-block;animation:pulse 2s ease infinite;flex-shrink:0"></span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--mint)">Announcements</span>
+        <span id="notices-count" style="font-family:'JetBrains Mono',monospace;font-size:.55rem;background:rgba(62,240,184,.1);border:1px solid rgba(62,240,184,.2);color:var(--mint);padding:2px 8px"></span>
+      </div>
+    </div>
+
+    <div id="notices-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;padding-bottom:28px">
+      <!-- filled by JS -->
+    </div>
+  </div>
+</section>
 
 <!-- SERVICES -->
 <section class="sec" id="services">
@@ -1340,7 +1413,7 @@ document.addEventListener('keydown', e => { if (e.key==='Escape') closePdModal()
   }
   try {
     const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
-    const { getFirestore, doc, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    const { getFirestore, doc, collection, query, where, orderBy, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
     const cfg = {
       apiKey:"AIzaSyCuEypEeXI7TVvos_1tMZ1o50EtJtefb7M",
       authDomain:"featuredesignzmain.firebaseapp.com",
@@ -1385,7 +1458,7 @@ document.addEventListener('keydown', e => { if (e.key==='Escape') closePdModal()
 
   try {
     const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
-    const { getFirestore, doc, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    const { getFirestore, doc, collection, query, where, orderBy, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
     const cfg = {
       apiKey:"AIzaSyCuEypEeXI7TVvos_1tMZ1o50EtJtefb7M",
       authDomain:"featuredesignzmain.firebaseapp.com",
@@ -1543,6 +1616,33 @@ function fdEsc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;
       applyMaintenanceMode(snap.exists() ? snap.data() : { enabled:false });
     });
 
+    // ── 8. NOTICES ───────────────────
+    onSnapshot(
+      query(collection(db,'notices'), where('active','==',true)),
+      snap => {
+        const notices = snap.docs
+          .map(d => ({ id:d.id, ...d.data() }))
+          .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+        renderNotices(notices);
+      },
+      _err => {
+        onSnapshot(collection(db,'notices'), snap2 => {
+          const notices = snap2.docs
+            .map(d => ({ id:d.id, ...d.data() }))
+            .filter(n => n.active === true)
+            .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+          renderNotices(notices);
+        });
+      }
+    );
+
+    // ── 9. NOTICES VISIBILITY ────────
+    onSnapshot(doc(db,'settings','notices'), snap => {
+      const visible = snap.exists() ? snap.data().visible !== false : true;
+      const sec = document.getElementById('notices-section');
+      if (sec && !visible) sec.style.display = 'none';
+    });
+
   } catch(e) {
     console.warn('Firebase init error:', e.message);
     renderProjectGrid([]); // show empty state
@@ -1680,6 +1780,130 @@ function applyServiceBadge(sid, status) {
 
 // Default all available while loading
 ['web','mobile','design','video'].forEach(sid => applyServiceBadge(sid,'available'));
+
+// ── NOTICES ──────────────────────────
+const NC_CFG = {
+  new:    { icon:'✨', label:'New',     cls:'nc-new',    color:'var(--mint)'  },
+  update: { icon:'🔄', label:'Update',  cls:'nc-update', color:'var(--blue2)' },
+  event:  { icon:'📅', label:'Event',   cls:'nc-event',  color:'var(--gold)'  },
+  video:  { icon:'🎬', label:'Video',   cls:'nc-video',  color:'#f87171'      },
+  info:   { icon:'💡', label:'Info',    cls:'nc-info',   color:'var(--txt3)'  },
+};
+
+let _noticeTimers = {};
+let _dismissedNotices = JSON.parse(sessionStorage.getItem('fd_dismissed') || '[]');
+
+function renderNotices(notices) {
+  const section = document.getElementById('notices-section');
+  const grid    = document.getElementById('notices-grid');
+  const countEl = document.getElementById('notices-count');
+  if (!section || !grid) return;
+
+  // Filter dismissed and expired
+  const now  = Date.now();
+  const valid = notices.filter(n => {
+    if (_dismissedNotices.includes(n.id)) return false;
+    if (n.expiresAt) {
+      const exp = n.expiresAt.toDate ? n.expiresAt.toDate().getTime() : new Date(n.expiresAt).getTime();
+      if (exp < now) return false;
+    }
+    return true;
+  });
+
+  if (!valid.length) {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = 'block';
+  if (countEl) countEl.textContent = valid.length;
+
+  grid.innerHTML = valid.map(n => buildNoticeCard(n)).join('');
+
+  // Start timers for expiring notices
+  Object.values(_noticeTimers).forEach(clearInterval);
+  _noticeTimers = {};
+  valid.forEach(n => {
+    if (n.expiresAt) startNoticeTimer(n);
+  });
+}
+
+function buildNoticeCard(n) {
+  const cfg   = NC_CFG[n.type] || NC_CFG.info;
+  const badge = `<div class="nc-badge" style="background:${cfg.color}18;border:1px solid ${cfg.color}40;color:${cfg.color}">${cfg.icon} ${cfg.label}</div>`;
+  const link  = n.linkUrl ? `<br><a href="${fdEsc(n.linkUrl)}" target="_blank" class="nc-link" ${n.linkUrl.startsWith('#')?'':'rel="noopener"'}>${fdEsc(n.linkLabel||'Learn More')} →</a>` : '';
+  const timer = n.expiresAt ? `<div class="nc-timer" id="nct-${n.id}"><span>⏱</span><span id="nct-txt-${n.id}">Calculating...</span></div>` : '';
+  const dismissBtn = n.dismissible !== false ? `<button class="nc-dismiss" onclick="dismissNotice('${n.id}')" title="Dismiss">✕</button>` : '';
+
+  return `<div class="notice-card ${cfg.cls}" id="nc-${n.id}">
+    ${dismissBtn}
+    ${badge}
+    <div class="nc-title">${fdEsc(n.title||'')}</div>
+    <div class="nc-body">${fdEsc(n.body||'')}${link}</div>
+    ${timer}
+  </div>`;
+}
+
+function startNoticeTimer(n) {
+  const update = () => {
+    const txtEl = document.getElementById('nct-txt-' + n.id);
+    const rowEl = document.getElementById('nct-' + n.id);
+    if (!txtEl) { clearInterval(_noticeTimers[n.id]); return; }
+
+    const exp  = n.expiresAt.toDate ? n.expiresAt.toDate().getTime() : new Date(n.expiresAt).getTime();
+    const diff = exp - Date.now();
+
+    if (diff <= 0) {
+      // Timer expired — remove card
+      clearInterval(_noticeTimers[n.id]);
+      const card = document.getElementById('nc-' + n.id);
+      if (card) { card.style.opacity='0';card.style.transform='scale(.96)';card.style.transition='all .4s'; setTimeout(()=>card.remove(),400); }
+      // Re-check if any left
+      setTimeout(() => {
+        const remaining = document.querySelectorAll('.notice-card');
+        if (!remaining.length) document.getElementById('notices-section').style.display='none';
+      }, 500);
+      return;
+    }
+
+    // Format remaining time
+    const d  = Math.floor(diff / 86400000);
+    const h  = Math.floor((diff % 86400000) / 3600000);
+    const m  = Math.floor((diff % 3600000)  / 60000);
+    const s  = Math.floor((diff % 60000)    / 1000);
+
+    let label = '';
+    if (d > 0) label = `Expires in ${d}d ${h}h ${m}m`;
+    else if (h > 0) label = `Expires in ${h}h ${m}m ${s}s`;
+    else if (m > 0) label = `Expires in ${m}m ${s}s`;
+    else label = `Expires in ${s}s`;
+
+    txtEl.textContent = label;
+    if (rowEl) {
+      rowEl.className = diff < 600000 ? 'nc-timer urgent' : diff < 3600000 ? 'nc-timer soon' : 'nc-timer';
+    }
+  };
+  update();
+  _noticeTimers[n.id] = setInterval(update, 1000);
+}
+
+window.dismissNotice = function(id) {
+  _dismissedNotices.push(id);
+  sessionStorage.setItem('fd_dismissed', JSON.stringify(_dismissedNotices));
+  const card = document.getElementById('nc-' + id);
+  if (card) {
+    card.style.opacity='0';card.style.transform='translateY(-8px)';card.style.transition='all .3s';
+    setTimeout(()=>{
+      card.remove();
+      const rem = document.querySelectorAll('.notice-card');
+      if (!rem.length) document.getElementById('notices-section').style.display='none';
+      else {
+        const c = document.getElementById('notices-count');
+        if (c) c.textContent = rem.length;
+      }
+    }, 320);
+  }
+};
 
 // ── MAINTENANCE MODE ─────────────────
 const MAINT_COLORS = {
