@@ -18,7 +18,8 @@ import { getAuth, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
          onAuthStateChanged, GoogleAuthProvider, signInWithPopup }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, doc, getDoc, getDocs, addDoc, updateDoc,
-         deleteDoc, onSnapshot, serverTimestamp, query, orderBy, setDoc }
+         deleteDoc, onSnapshot, serverTimestamp, query, orderBy, setDoc,
+         where, Timestamp }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // Expose modules globally for service status functions in regular <script>
