@@ -113,8 +113,8 @@ nav{
 .hero{
   min-height:100vh;
   display:grid;grid-template-columns:1fr 1fr;
-  align-items:flex-start;gap:0;
-  padding:120px 60px 60px;
+  align-items:center;gap:0;
+  padding:80px 60px 60px;
   position:relative;overflow:hidden;
 }
 
@@ -136,13 +136,13 @@ nav{
 }
 
 /* left */
-.hero-l{position:relative;z-index:2;display:flex;flex-direction:column}
+.hero-l{position:relative;z-index:2}
 
 .hero-tag{
   display:inline-flex;align-items:center;gap:8px;
   font-family:'JetBrains Mono',monospace;font-size:.65rem;letter-spacing:.2em;text-transform:uppercase;
   color:var(--cyan);border:1px solid rgba(56,217,245,0.25);background:rgba(56,217,245,0.05);
-  padding:7px 16px;margin-bottom:20px;
+  padding:7px 16px;margin-bottom:28px;
   opacity:0;animation:up .6s .3s forwards;
 }
 .tag-dot{width:6px;height:6px;border-radius:50%;background:var(--cyan);animation:blink 1.8s ease infinite}
@@ -153,7 +153,7 @@ nav{
   font-weight:800;
   font-size:clamp(2.8rem,5.2vw,5.5rem);
   line-height:.97;letter-spacing:-.04em;
-  margin-bottom:16px;
+  margin-bottom:22px;
   opacity:0;animation:up .8s .5s forwards;
 }
 .hero-h1 .gr{
@@ -170,12 +170,11 @@ nav{
 /* code snippet decoration */
 .hero-code{
   font-family:'JetBrains Mono',monospace;font-size:.8rem;line-height:1.7;
-  color:var(--txt3);margin-bottom:24px;
-  padding:12px 16px;
+  color:var(--txt3);margin-bottom:32px;
+  padding:16px 20px;
   background:rgba(7,17,43,0.7);border:1px solid var(--bdr);
   border-left:3px solid var(--blue);
   opacity:0;animation:up .8s .7s forwards;
-  overflow-x:hidden;
 }
 .code-kw{color:var(--pink)}
 .code-fn{color:var(--blue2)}
@@ -206,7 +205,6 @@ nav{
 /* right — floating UI cards */
 .hero-r{
   position:relative;z-index:2;height:500px;
-  align-self:center;
   opacity:0;animation:fadeR .9s .7s forwards;
 }
 @keyframes fadeR{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
@@ -1413,7 +1411,7 @@ document.addEventListener('keydown', e => { if (e.key==='Escape') closePdModal()
   }
   try {
     const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
-    const { getFirestore, doc, collection, query, where, orderBy, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    const { getFirestore, doc, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
     const cfg = {
       apiKey:"AIzaSyCuEypEeXI7TVvos_1tMZ1o50EtJtefb7M",
       authDomain:"featuredesignzmain.firebaseapp.com",
@@ -1458,7 +1456,7 @@ document.addEventListener('keydown', e => { if (e.key==='Escape') closePdModal()
 
   try {
     const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
-    const { getFirestore, doc, collection, query, where, orderBy, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    const { getFirestore, doc, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
     const cfg = {
       apiKey:"AIzaSyCuEypEeXI7TVvos_1tMZ1o50EtJtefb7M",
       authDomain:"featuredesignzmain.firebaseapp.com",
@@ -1617,22 +1615,12 @@ function fdEsc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;
     });
 
     // ── 8. NOTICES ───────────────────
+    const { collection: _ncol, query: _nqry, where: _nwhr, orderBy: _nord } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
     onSnapshot(
-      query(collection(db,'notices'), where('active','==',true)),
+      _nqry(_ncol(db,'notices'), _nwhr('active','==',true), _nord('createdAt','desc')),
       snap => {
-        const notices = snap.docs
-          .map(d => ({ id:d.id, ...d.data() }))
-          .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+        const notices = snap.docs.map(d => ({ id:d.id, ...d.data() }));
         renderNotices(notices);
-      },
-      _err => {
-        onSnapshot(collection(db,'notices'), snap2 => {
-          const notices = snap2.docs
-            .map(d => ({ id:d.id, ...d.data() }))
-            .filter(n => n.active === true)
-            .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
-          renderNotices(notices);
-        });
       }
     );
 
