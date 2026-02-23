@@ -247,7 +247,6 @@ function initApp(user, role) {
   subscribeStudioStatus();
   loadAiSettings();
   subscribeHeroStats();
-  subscribeMaintenanceMode();
   if (role === 'main_admin') subscribeAdmins();
 
   // Show dashboard
@@ -799,14 +798,13 @@ window.gotoPage = function(id) {
   document.querySelectorAll('.sb-it').forEach(i => {
     if (i.getAttribute('onclick')?.includes("'" + id + "'")) i.classList.add('on');
   });
-  const titles = { dashboard:'Dashboard', projects:'All Projects', project_view:'Projects Overview', messages:'Messages', website:'Website Overview', herostats:'Hero Stats', maintenance:'Maintenance Mode', studio:'Studio Status', services:'Services Status', youtube:'YouTube Section', social:'Social Media Links', admins:'Admin Management', settings:'Settings' };
+  const titles = { dashboard:'Dashboard', projects:'All Projects', project_view:'Projects Overview', messages:'Messages', website:'Website Overview', herostats:'Hero Stats', studio:'Studio Status', services:'Services Status', youtube:'YouTube Section', social:'Social Media Links', admins:'Admin Management', settings:'Settings' };
   const el = document.getElementById('tb-title');
   if (el) el.textContent = titles[id] || id;
   if (id === 'dashboard') renderDash();
   if (id === 'project_view') renderProjectsSection();
   if (id === 'website')  renderWebsitePage();
   if (id === 'herostats') renderHeroStatsPage();
-  if (id === 'maintenance') renderMaintenancePage();
   if (id === 'studio')   renderStudioPage();
   if (id === 'services') renderServicePage();
   if (id === 'youtube')  renderYoutubePage();
@@ -1014,9 +1012,6 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9000;
 .btn-danger:hover{background:var(--red);color:white}
 .btn-success{background:transparent;color:var(--mint);border:1px solid rgba(62,240,184,.3)}
 .btn-success:hover{background:var(--mint);color:#020510}
-.maint-type-btn{font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.08em;padding:7px 14px;background:transparent;border:1px solid var(--bdr2);color:var(--txt3);cursor:pointer;transition:all .2s}
-.maint-type-btn:hover{border-color:var(--blue);color:var(--blue2)}
-.maint-type-btn.active{background:rgba(82,130,255,.15);border-color:var(--blue);color:var(--blue2)}
 .btn-ai{background:linear-gradient(135deg,rgba(82,130,255,.25),rgba(56,217,245,.2));border:1px solid rgba(82,130,255,.5);color:var(--blue2);font-weight:600}
 .btn-ai:hover{background:linear-gradient(135deg,rgba(82,130,255,.4),rgba(56,217,245,.3))}
 .btn-gmail{background:#ea4335;color:white}
@@ -1291,11 +1286,6 @@ tr:hover td{background:rgba(82,130,255,.03)}
         <svg class="sb-ico" viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
         Hero Stats
       </div>
-      <div class="sb-it" id="sb-maintenance" onclick="gotoPage('maintenance')" style="position:relative">
-        <svg class="sb-ico" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
-        Maintenance Mode
-        <span id="sb-maint-badge" style="display:none;position:absolute;top:8px;right:10px;background:var(--red);color:#fff;font-family:'JetBrains Mono',monospace;font-size:.45rem;letter-spacing:.1em;padding:2px 6px;animation:pulse 2s ease infinite">● ON</span>
-      </div>
       <div class="sb-it" onclick="gotoPage('studio')">
         <svg class="sb-ico" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
         Studio Status
@@ -1535,97 +1525,6 @@ tr:hover td{background:rgba(82,130,255,.03)}
             </div>
 
           </div>
-        </div>
-      </div>
-
-      <!-- MAINTENANCE MODE -->
-      <div class="page" id="page-maintenance">
-        <div class="ph">
-          <div class="ph-title">Maintenance <em>Mode</em></div>
-        </div>
-
-        <div style="max-width:660px;margin:0 auto">
-
-          <!-- MAIN TOGGLE CARD -->
-          <div id="maint-toggle-card" style="background:var(--bg2);border:2px solid var(--bdr);padding:28px;margin-bottom:20px;transition:all .3s;text-align:center">
-            <div style="font-size:3rem;margin-bottom:12px" id="maint-icon-display">⚙️</div>
-            <div id="maint-status-label" style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.3rem;margin-bottom:6px;color:var(--txt3)">Maintenance Mode — OFF</div>
-            <div id="maint-status-sub" style="font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--txt3);letter-spacing:.1em;margin-bottom:22px">Website is live and accessible to visitors</div>
-
-            <!-- Big toggle -->
-            <div style="display:flex;align-items:center;justify-content:center;gap:16px">
-              <span style="font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--txt3);letter-spacing:.1em">OFF</span>
-              <div id="maint-big-track" onclick="toggleMaintenance()"
-                style="width:72px;height:36px;background:var(--bg4);border:2px solid var(--bdr2);cursor:pointer;position:relative;transition:all .3s">
-                <div id="maint-big-thumb"
-                  style="position:absolute;top:4px;left:4px;width:24px;height:24px;background:var(--txt3);transition:all .3s"></div>
-              </div>
-              <span style="font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--txt3);letter-spacing:.1em">ON</span>
-            </div>
-          </div>
-
-          <!-- NOTICE EDITOR -->
-          <div style="background:var(--bg2);border:1px solid var(--bdr);padding:22px;margin-bottom:16px">
-            <div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:.96rem;margin-bottom:16px;display:flex;align-items:center;gap:8px">
-              <span style="width:14px;height:2px;background:linear-gradient(90deg,var(--blue),var(--cyan));display:inline-block"></span>
-              Maintenance Notice Details
-            </div>
-
-            <div class="fg">
-              <label class="fl">Title / Heading</label>
-              <input class="fi" id="maint-title" type="text" value="We're Upgrading Our Studio"
-                placeholder="e.g. We're Upgrading Our Studio">
-            </div>
-
-            <div class="fg">
-              <label class="fl">Message to Visitors</label>
-              <textarea class="fta" id="maint-msg" rows="3" placeholder="Tell visitors what's happening and when you'll be back...">Our website is currently undergoing scheduled maintenance and upgrades. We'll be back shortly with an improved experience.</textarea>
-            </div>
-
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-              <div class="fg">
-                <label class="fl">Expected Back Time <span style="color:var(--txt3);font-weight:400">(optional)</span></label>
-                <input class="fi" id="maint-eta" type="text" placeholder="e.g. Back in 2 hours  or  Jan 15, 3PM">
-              </div>
-              <div class="fg">
-                <label class="fl">Contact Email <span style="color:var(--txt3);font-weight:400">(optional)</span></label>
-                <input class="fi" id="maint-email" type="email" value="infofeaturedesignz@gmail.com" placeholder="your@email.com">
-              </div>
-            </div>
-
-            <div class="fg">
-              <label class="fl">Notice Type</label>
-              <div style="display:flex;gap:8px;flex-wrap:wrap">
-                <button class="maint-type-btn active" data-type="maintenance" onclick="selectMaintType(this,'maintenance')">⚙️ Maintenance</button>
-                <button class="maint-type-btn" data-type="update" onclick="selectMaintType(this,'update')">🚀 Update / Upgrade</button>
-                <button class="maint-type-btn" data-type="emergency" onclick="selectMaintType(this,'emergency')">🔴 Emergency</button>
-                <button class="maint-type-btn" data-type="holiday" onclick="selectMaintType(this,'holiday')">🎉 Holiday / Break</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- PREVIEW -->
-          <div style="background:var(--bg2);border:1px solid var(--bdr);padding:16px;margin-bottom:16px">
-            <div style="font-family:'JetBrains Mono',monospace;font-size:.55rem;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3);margin-bottom:12px">Live Page Preview</div>
-            <div style="background:linear-gradient(135deg,#020510,#050c1e,#020510);border:1px solid rgba(82,130,255,.2);padding:30px 20px;text-align:center;min-height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px">
-              <div id="prev-icon" style="font-size:2.2rem">⚙️</div>
-              <div id="prev-title" style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.1rem;color:#fff">We're Upgrading Our Studio</div>
-              <div id="prev-msg" style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:rgba(255,255,255,.5);max-width:340px;line-height:1.8">Our website is currently undergoing scheduled maintenance...</div>
-              <div id="prev-eta" style="display:none;font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--mint);padding:4px 14px;border:1px solid rgba(62,240,184,.3)">⏱ Back in 2 hours</div>
-            </div>
-          </div>
-
-          <!-- WARNING -->
-          <div style="background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.25);padding:13px 16px;margin-bottom:16px;display:flex;gap:12px;align-items:flex-start">
-            <span style="font-size:1.2rem;flex-shrink:0">⚠️</span>
-            <div style="font-size:.82rem;color:var(--txt2);line-height:1.7">
-              <strong style="color:var(--red)">Warning:</strong> Turning ON maintenance mode will show the maintenance page to <strong>all visitors</strong>. Admins can still access the site normally.
-            </div>
-          </div>
-
-          <button class="btn btn-primary" onclick="saveMaintenanceSettings()" style="width:100%;justify-content:center;padding:13px">
-            💾 Save Settings
-          </button>
         </div>
       </div>
 
@@ -2610,147 +2509,6 @@ function updateWsStudio(status) {
     }
   });
 }
-
-/* ══════════════════════════════════════
-   MAINTENANCE MODE
-══════════════════════════════════════ */
-let maintCache   = { enabled:false, type:'maintenance' };
-let maintEnabled = false;
-
-const MAINT_TYPE_CFG = {
-  maintenance: { icon:'⚙️',  color:'#7ba4ff', label:'Maintenance Mode' },
-  update:      { icon:'🚀',  color:'#3ef0b8', label:'Updating Site'    },
-  emergency:   { icon:'🔴',  color:'#f87171', label:'Emergency Fix'    },
-  holiday:     { icon:'🎉',  color:'#f5c842', label:'On Break'         },
-};
-
-function subscribeMaintenanceMode() {
-  const _db = window.__db;
-  if (!_db) { setTimeout(subscribeMaintenanceMode, 600); return; }
-  const { doc, onSnapshot } = window.__fbModules;
-  onSnapshot(doc(_db,'settings','maintenance'), snap => {
-    maintCache   = snap.exists() ? snap.data() : { enabled:false, type:'maintenance' };
-    maintEnabled = maintCache.enabled === true;
-    renderMaintenancePage();
-    updateSbMaintBadge();
-  });
-}
-
-function updateSbMaintBadge() {
-  const badge = document.getElementById('sb-maint-badge');
-  const card  = document.getElementById('sb-maintenance');
-  if (badge) badge.style.display = maintEnabled ? 'block' : 'none';
-  if (card)  card.style.color    = maintEnabled ? 'var(--red)' : '';
-}
-
-function renderMaintenancePage() {
-  // Restore form values
-  const s = (id,v) => { const el=document.getElementById(id); if(el&&v!==undefined) el.value=v; };
-  s('maint-title', maintCache.title   || "We're Upgrading Our Studio");
-  s('maint-msg',   maintCache.message || "Our website is currently undergoing scheduled maintenance and upgrades. We'll be back shortly with an improved experience.");
-  s('maint-eta',   maintCache.eta     || '');
-  s('maint-email', maintCache.email   || 'infofeaturedesignz@gmail.com');
-
-  // Type buttons
-  const type = maintCache.type || 'maintenance';
-  document.querySelectorAll('.maint-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
-
-  applyMaintToggleUI(maintEnabled);
-  maintPreviewUpdate();
-}
-
-function applyMaintToggleUI(enabled) {
-  maintEnabled = enabled;
-  const track  = document.getElementById('maint-big-track');
-  const thumb  = document.getElementById('maint-big-thumb');
-  const label  = document.getElementById('maint-status-label');
-  const sub    = document.getElementById('maint-status-sub');
-  const card   = document.getElementById('maint-toggle-card');
-  const icon   = document.getElementById('maint-icon-display');
-  const type   = document.querySelector('.maint-type-btn.active')?.dataset?.type || 'maintenance';
-  const cfg    = MAINT_TYPE_CFG[type] || MAINT_TYPE_CFG.maintenance;
-
-  if (enabled) {
-    if (track) { track.style.background=`rgba(248,113,113,.2)`;track.style.borderColor='rgba(248,113,113,.5)'; }
-    if (thumb) { thumb.style.background='var(--red)';thumb.style.transform='translateX(36px)'; }
-    if (label) { label.textContent='Maintenance Mode — ON';label.style.color='var(--red)'; }
-    if (sub)   sub.textContent = 'Website is OFFLINE for visitors — showing maintenance page';
-    if (card)  { card.style.borderColor='rgba(248,113,113,.4)';card.style.background='rgba(248,113,113,.05)'; }
-    if (icon)  icon.textContent = cfg.icon;
-  } else {
-    if (track) { track.style.background='var(--bg4)';track.style.borderColor='var(--bdr2)'; }
-    if (thumb) { thumb.style.background='var(--txt3)';thumb.style.transform='translateX(0)'; }
-    if (label) { label.textContent='Maintenance Mode — OFF';label.style.color='var(--txt3)'; }
-    if (sub)   sub.textContent='Website is live and accessible to visitors';
-    if (card)  { card.style.borderColor='var(--bdr)';card.style.background='var(--bg2)'; }
-    if (icon)  icon.textContent = '⚙️';
-  }
-}
-
-window.toggleMaintenance = async function() {
-  const newState = !maintEnabled;
-  applyMaintToggleUI(newState);
-  await saveMaintenanceSettings(newState);
-};
-
-window.selectMaintType = function(btn, type) {
-  document.querySelectorAll('.maint-type-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  maintPreviewUpdate();
-};
-
-function maintPreviewUpdate() {
-  const title = document.getElementById('maint-title')?.value || '';
-  const msg   = document.getElementById('maint-msg')?.value   || '';
-  const eta   = document.getElementById('maint-eta')?.value   || '';
-  const type  = document.querySelector('.maint-type-btn.active')?.dataset?.type || 'maintenance';
-  const cfg   = MAINT_TYPE_CFG[type] || MAINT_TYPE_CFG.maintenance;
-
-  const setEl = (id,v) => { const el=document.getElementById(id); if(el) el.textContent=v; };
-  setEl('prev-icon',  cfg.icon);
-  setEl('prev-title', title);
-  setEl('prev-msg',   msg.length > 80 ? msg.substring(0,80)+'...' : msg);
-
-  const etaEl = document.getElementById('prev-eta');
-  if (etaEl) {
-    if (eta) { etaEl.textContent='⏱ '+eta; etaEl.style.display='block'; }
-    else etaEl.style.display='none';
-  }
-}
-
-// Wire live preview
-['maint-title','maint-msg','maint-eta'].forEach(id => {
-  document.addEventListener('DOMContentLoaded', () => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('input', maintPreviewUpdate);
-  });
-});
-
-window.saveMaintenanceSettings = async function(enabledOverride) {
-  const _db = window.__db;
-  if (!_db) { toast('Database not ready','error'); return; }
-  const enabled  = enabledOverride !== undefined ? enabledOverride : maintEnabled;
-  const type     = document.querySelector('.maint-type-btn.active')?.dataset?.type || 'maintenance';
-  const title    = document.getElementById('maint-title')?.value?.trim()  || "We're Upgrading";
-  const message  = document.getElementById('maint-msg')?.value?.trim()    || '';
-  const eta      = document.getElementById('maint-eta')?.value?.trim()    || '';
-  const email    = document.getElementById('maint-email')?.value?.trim()  || '';
-  const cfg      = MAINT_TYPE_CFG[type] || MAINT_TYPE_CFG.maintenance;
-
-  try {
-    const { doc, setDoc, serverTimestamp } = window.__fbModules;
-    await setDoc(doc(_db,'settings','maintenance'), {
-      enabled, type, title, message, eta, email,
-      icon: cfg.icon, typeLabel: cfg.label,
-      updatedAt: serverTimestamp(),
-      updatedBy: window.currentUser?.email || 'admin'
-    });
-    maintCache = { enabled, type, title, message, eta, email };
-    updateSbMaintBadge();
-    toast(enabled ? '🔴 Maintenance Mode ON — website offline for visitors!' : '✅ Maintenance Mode OFF — website is live!',
-          enabled ? 'error' : 'success');
-  } catch(e) { toast('Error: '+e.message,'error'); }
-};
 
 /* ══════════════════════════════════════
    HERO STATS MANAGEMENT
