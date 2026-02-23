@@ -121,8 +121,8 @@ nav{
 .hero{
   min-height:100vh;
   display:grid;grid-template-columns:1fr 1fr;
-  align-items:center;gap:0;
-  padding:100px 60px 60px;
+  align-items:flex-start;gap:0;
+  padding:120px 60px 60px;
   position:relative;overflow:hidden;
 }
 
@@ -183,6 +183,7 @@ nav{
   background:rgba(7,17,43,0.7);border:1px solid var(--bdr);
   border-left:3px solid var(--blue);
   opacity:0;animation:up .8s .7s forwards;
+  overflow-x:hidden;word-break:break-word;
 }
 .code-kw{color:var(--pink)}
 .code-fn{color:var(--blue2)}
@@ -213,6 +214,7 @@ nav{
 /* right — floating UI cards */
 .hero-r{
   position:relative;z-index:2;height:500px;
+  align-self:center;
   opacity:0;animation:fadeR .9s .7s forwards;
 }
 @keyframes fadeR{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
@@ -1636,16 +1638,25 @@ const _runFirebase = async function initFrontendFirebase() {
 
     // ── 8. NOTICES ───────────────────
     onSnapshot(
-      query(collection(db,'notices'), where('active','==',true), orderBy('createdAt','desc')),
+      query(collection(db,'notices'), where('active','==',true)),
       snap => {
-        const notices = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+        const notices = snap.docs
+          .map(d => ({ id:d.id, ...d.data() }))
+          .sort((a,b) => {
+            const ta = a.createdAt?.seconds || 0;
+            const tb = b.createdAt?.seconds || 0;
+            return tb - ta;
+          });
         renderNotices(notices);
       },
       err => {
-        // Fallback: load all notices if query fails (e.g. missing index)
-        console.warn('Notices query error, trying fallback:', err.message);
+        // Fallback: get all notices, filter active in JS
+        console.warn('Notices query error, using fallback:', err.message);
         onSnapshot(collection(db,'notices'), snap2 => {
-          const notices = snap2.docs.map(d => ({ id:d.id, ...d.data() })).filter(n => n.active);
+          const notices = snap2.docs
+            .map(d => ({ id:d.id, ...d.data() }))
+            .filter(n => n.active === true)
+            .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
           renderNotices(notices);
         });
       }
