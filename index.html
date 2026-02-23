@@ -847,23 +847,6 @@ footer{background:var(--bg1);border-top:1px solid var(--bdr);padding:56px 60px 3
   </div>
 </div>
 
-<!-- NOTICES -->
-<section id="notices-section" style="display:none;padding:0;background:transparent">
-  <div style="max-width:1200px;margin:0 auto;padding:0 32px">
-
-    <div id="notices-header" style="display:flex;align-items:center;justify-content:space-between;padding:20px 0 12px">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span id="notices-pulse-dot" style="width:8px;height:8px;border-radius:50%;background:var(--mint);display:inline-block;animation:pulse 2s ease infinite;flex-shrink:0"></span>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--mint)">Announcements</span>
-        <span id="notices-count" style="font-family:'JetBrains Mono',monospace;font-size:.55rem;background:rgba(62,240,184,.1);border:1px solid rgba(62,240,184,.2);color:var(--mint);padding:2px 8px"></span>
-      </div>
-    </div>
-
-    <div id="notices-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;padding-bottom:28px">
-      <!-- filled by JS -->
-    </div>
-  </div>
-</section>
 
 <!-- SERVICES -->
 <section class="sec" id="services">
@@ -1167,6 +1150,25 @@ footer{background:var(--bg1);border-top:1px solid var(--bdr);padding:56px 60px 3
         <button type="submit" class="csub">Send Message →</button>
         <div id="cok">✓ Message received! We'll reply within 24 hours.</div>
       </form>
+    </div>
+  </div>
+</section>
+
+
+<!-- NOTICES -->
+<section id="notices-section" style="display:none;padding:0;background:transparent">
+  <div style="max-width:1200px;margin:0 auto;padding:0 32px">
+
+    <div id="notices-header" style="display:flex;align-items:center;justify-content:space-between;padding:20px 0 12px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span id="notices-pulse-dot" style="width:8px;height:8px;border-radius:50%;background:var(--mint);display:inline-block;animation:pulse 2s ease infinite;flex-shrink:0"></span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--mint)">Announcements</span>
+        <span id="notices-count" style="font-family:'JetBrains Mono',monospace;font-size:.55rem;background:rgba(62,240,184,.1);border:1px solid rgba(62,240,184,.2);color:var(--mint);padding:2px 8px"></span>
+      </div>
+    </div>
+
+    <div id="notices-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;padding-bottom:28px">
+      <!-- filled by JS -->
     </div>
   </div>
 </section>
