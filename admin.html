@@ -871,6 +871,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('cfm-ok').onclick = () => { if (cfmCb) cfmCb(); closeCfm(); };
 });
 
+
+/* ══════════════════════════════════════
+   NOTICE MODAL FUNCTIONS
+══════════════════════════════════════ */
+
 let tTimer;
 window.toast = function(msg, type = 'success') {
   const el = document.getElementById('toast');
@@ -1580,78 +1585,7 @@ tr:hover td{background:rgba(82,130,255,.03)}
         </div>
       </div>
 
-      <!-- NOTICE MODAL -->
-      <div class="modal-bg" id="noticeModal">
-        <div class="modal" style="max-width:580px">
-          <div class="mh">
-            <div class="mh-title" id="notice-modal-title">Add Notice</div>
-            <button class="mc-x" onclick="closeM('noticeModal')">✕</button>
-          </div>
-          <div class="mb" style="display:flex;flex-direction:column;gap:14px">
 
-            <div class="fg">
-              <label class="fl">Notice Type</label>
-              <div style="display:flex;gap:7px;flex-wrap:wrap" id="notice-type-btns">
-                <button class="maint-type-btn active" data-ntype="new"    onclick="selectNoticeType(this,'new')">✨ New</button>
-                <button class="maint-type-btn" data-ntype="update"  onclick="selectNoticeType(this,'update')">🔄 Update</button>
-                <button class="maint-type-btn" data-ntype="event"   onclick="selectNoticeType(this,'event')">📅 Event</button>
-                <button class="maint-type-btn" data-ntype="video"   onclick="selectNoticeType(this,'video')">🎬 Video</button>
-                <button class="maint-type-btn" data-ntype="info"    onclick="selectNoticeType(this,'info')">💡 Info</button>
-              </div>
-            </div>
-
-            <div class="fg"><label class="fl">Title</label>
-              <input class="fi" id="nm-title" type="text" placeholder="e.g. New Video Released!">
-            </div>
-
-            <div class="fg"><label class="fl">Message Body</label>
-              <textarea class="fta" id="nm-body" rows="3" placeholder="Details about this announcement..."></textarea>
-            </div>
-
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-              <div class="fg"><label class="fl">Link URL <span style="color:var(--txt3);font-weight:400">(optional)</span></label>
-                <input class="fi" id="nm-link-url" type="url" placeholder="https://...">
-              </div>
-              <div class="fg"><label class="fl">Link Label</label>
-                <input class="fi" id="nm-link-label" type="text" placeholder="Watch Now, Learn More...">
-              </div>
-            </div>
-
-            <div class="fg">
-              <label class="fl">Auto-Expire Timer <span style="color:var(--txt3);font-weight:400">(optional)</span></label>
-              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:8px" id="timer-presets">
-                <button class="maint-type-btn" onclick="setTimerPreset(1)">1 Hour</button>
-                <button class="maint-type-btn" onclick="setTimerPreset(6)">6 Hours</button>
-                <button class="maint-type-btn" onclick="setTimerPreset(24)">1 Day</button>
-                <button class="maint-type-btn" onclick="setTimerPreset(72)">3 Days</button>
-                <button class="maint-type-btn" onclick="setTimerPreset(168)">1 Week</button>
-                <button class="maint-type-btn" onclick="setTimerPreset(336)">2 Weeks</button>
-                <button class="maint-type-btn" onclick="setTimerPreset(720)">1 Month</button>
-                <button class="maint-type-btn" data-preset="0" onclick="setTimerPreset(0)">No Expiry</button>
-              </div>
-              <input class="fi" id="nm-expires" type="datetime-local" placeholder="Or pick exact date/time">
-              <div style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--txt3);margin-top:4px" id="nm-expires-preview"></div>
-            </div>
-
-            <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg3);border:1px solid var(--bdr);padding:12px 14px">
-              <div>
-                <div class="fl" style="margin-bottom:2px">Allow Dismiss</div>
-                <div style="font-size:.73rem;color:var(--txt3)">Visitors can close this notice</div>
-              </div>
-              <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer">
-                <input type="checkbox" id="nm-dismissible" checked style="opacity:0;width:0;height:0">
-                <span id="nm-dis-track" style="position:absolute;inset:0;background:rgba(62,240,184,.2);border:1px solid rgba(62,240,184,.4);transition:.3s">
-                  <span id="nm-dis-thumb" style="position:absolute;top:3px;left:3px;width:16px;height:16px;background:var(--mint);transform:translateX(20px);transition:.3s"></span>
-                </span>
-              </label>
-            </div>
-
-          </div>
-          <div class="mf">
-            <button class="btn btn-ghost" onclick="closeM('noticeModal')">Cancel</button>
-            <button class="btn btn-primary" onclick="saveNotice()" id="notice-save-btn">Save Notice</button>
-          </div>
-        </div>
       </div>
 
       <!-- MAINTENANCE MODE -->
@@ -2752,6 +2686,12 @@ function subscribeNotices() {
       noticesCache = snap.docs.map(d => ({ id:d.id, ...d.data() }));
       renderNoticesAdminPage();
       updateNoticesBadge();
+    },
+    err => {
+      console.error('subscribeNotices error:', err.message);
+      if (err.code === 'permission-denied') {
+        toast('⚠️ Firestore rules need /notices/ collection! Check rules.txt', 'error');
+      }
     }
   );
   // Also watch visibility setting
@@ -2840,40 +2780,6 @@ window.toggleNoticesVisibility = async function() {
 };
 
 // ── MODAL ─────────────────────────
-window.openNoticeModal = function(id) {
-  noticeEditId = id;
-  document.getElementById('notice-modal-title').textContent = id ? 'Edit Notice' : 'Add Notice';
-
-  // Clear
-  ['nm-title','nm-body','nm-link-url','nm-link-label','nm-expires'].forEach(i => {
-    const el = document.getElementById(i); if (el) el.value = '';
-  });
-  document.getElementById('nm-dismissible').checked = true;
-  document.querySelectorAll('#notice-type-btns .maint-type-btn').forEach(b => b.classList.remove('active'));
-  document.querySelector('#notice-type-btns [data-ntype="new"]')?.classList.add('active');
-  document.getElementById('nm-expires-preview').textContent = '';
-  document.querySelectorAll('#timer-presets .maint-type-btn').forEach(b => b.classList.remove('active'));
-
-  if (id) {
-    const n = noticesCache.find(x => x.id === id);
-    if (!n) return;
-    const s = (eid, val) => { const el = document.getElementById(eid); if(el&&val!==undefined) el.value=val; };
-    s('nm-title',       n.title     || '');
-    s('nm-body',        n.body      || '');
-    s('nm-link-url',    n.linkUrl   || '');
-    s('nm-link-label',  n.linkLabel || '');
-    if (n.expiresAt) {
-      const d = n.expiresAt.toDate ? n.expiresAt.toDate() : new Date(n.expiresAt);
-      document.getElementById('nm-expires').value = d.toISOString().slice(0,16);
-    }
-    document.getElementById('nm-dismissible').checked = n.dismissible !== false;
-    const typeBtn = document.querySelector(`#notice-type-btns [data-ntype="${n.type}"]`);
-    if (typeBtn) { document.querySelectorAll('#notice-type-btns .maint-type-btn').forEach(b=>b.classList.remove('active')); typeBtn.classList.add('active'); }
-    updateNmExpiresPreview();
-  }
-
-  openM('noticeModal');
-};
 
 window.selectNoticeType = function(btn, type) {
   document.querySelectorAll('#notice-type-btns .maint-type-btn').forEach(b => b.classList.remove('active'));
@@ -2943,8 +2849,8 @@ window.saveNotice = async function() {
       await addDoc(collection(_db,'notices'), data);
       toast('Notice published ✓','success');
     }
-    closeM('noticeModal');
-  } catch(e) { toast('Error: '+e.message,'error'); }
+    closeNoticeModal();
+  } catch(e) { toast('Error saving: '+e.message,'error'); console.error('saveNotice error:',e); }
   finally {
     const btn = document.getElementById('notice-save-btn');
     if (btn) { btn.textContent='Save Notice'; btn.disabled=false; }
@@ -3531,6 +3437,56 @@ window.sendAiViaGmail = function() {
 };
 
 // Update settings page on open
+
+/* ══════════════════════
+   NOTICE MODAL
+══════════════════════ */
+window.openNoticeModal = function(id) {
+  noticeEditId = id;
+  document.getElementById('notice-modal-title').textContent = id ? 'Edit Notice' : 'Add Notice';
+  ['nm-title','nm-body','nm-link-url','nm-link-label','nm-expires'].forEach(function(i) {
+    var el = document.getElementById(i); if (el) el.value = '';
+  });
+  var disc = document.getElementById('nm-dismissible');
+  if (disc) disc.checked = true;
+  document.querySelectorAll('#notice-type-btns .maint-type-btn').forEach(function(b){ b.classList.remove('active'); });
+  var defBtn = document.querySelector('#notice-type-btns [data-ntype="new"]');
+  if (defBtn) defBtn.classList.add('active');
+  var ep = document.getElementById('nm-expires-preview');
+  if (ep) ep.textContent = '';
+  document.querySelectorAll('#timer-presets .maint-type-btn').forEach(function(b){ b.classList.remove('active'); });
+
+  if (id) {
+    var n = noticesCache.find(function(x){ return x.id === id; });
+    if (n) {
+      var s = function(eid, val) { var el=document.getElementById(eid); if(el&&val!==undefined) el.value=val; };
+      s('nm-title', n.title || '');
+      s('nm-body', n.body || '');
+      s('nm-link-url', n.linkUrl || '');
+      s('nm-link-label', n.linkLabel || '');
+      if (n.expiresAt) {
+        var d = n.expiresAt.toDate ? n.expiresAt.toDate() : new Date(n.expiresAt);
+        var exEl = document.getElementById('nm-expires');
+        if (exEl) exEl.value = d.toISOString().slice(0,16);
+      }
+      if (disc) disc.checked = n.dismissible !== false;
+      var tb = document.querySelector('#notice-type-btns [data-ntype="'+n.type+'"]');
+      if (tb) {
+        document.querySelectorAll('#notice-type-btns .maint-type-btn').forEach(function(b){ b.classList.remove('active'); });
+        tb.classList.add('active');
+      }
+      if (typeof updateNmExpiresPreview === 'function') updateNmExpiresPreview();
+    }
+  }
+  var m = document.getElementById('noticeModal');
+  if (m) { m.style.display = 'flex'; document.body.style.overflow = 'hidden'; }
+};
+
+window.closeNoticeModal = function() {
+  var m = document.getElementById('noticeModal');
+  if (m) { m.style.display = 'none'; document.body.style.overflow = ''; }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   const emailEl = document.getElementById('qs-email');
   const roleEl  = document.getElementById('qs-role');
@@ -3594,5 +3550,81 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
   </div>
 
+
+<!-- ═══════════════════════════════════
+     NOTICE MODAL - TOP LEVEL
+═══════════════════════════════════ -->
+<div id="noticeModal" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(2,5,16,.92);align-items:center;justify-content:center;overflow-y:auto;padding:20px" onclick="if(event.target===this)closeNoticeModal()">
+  <div style="background:var(--bg2);border:1px solid var(--bdr2);max-width:580px;width:100%;position:relative;animation:up .3s ease">
+    <div class="mh">
+      <div class="mh-title" id="notice-modal-title">Add Notice</div>
+      <button class="mc-x" onclick="closeNoticeModal()">✕</button>
+    </div>
+    <div class="mb" style="display:flex;flex-direction:column;gap:14px">
+
+      <div class="fg">
+        <label class="fl">Notice Type</label>
+        <div style="display:flex;gap:7px;flex-wrap:wrap" id="notice-type-btns">
+          <button class="maint-type-btn active" data-ntype="new"    onclick="selectNoticeType(this,'new')">✨ New</button>
+          <button class="maint-type-btn" data-ntype="update"  onclick="selectNoticeType(this,'update')">🔄 Update</button>
+          <button class="maint-type-btn" data-ntype="event"   onclick="selectNoticeType(this,'event')">📅 Event</button>
+          <button class="maint-type-btn" data-ntype="video"   onclick="selectNoticeType(this,'video')">🎬 Video</button>
+          <button class="maint-type-btn" data-ntype="info"    onclick="selectNoticeType(this,'info')">💡 Info</button>
+        </div>
+      </div>
+
+      <div class="fg"><label class="fl">Title <span style="color:var(--red)">*</span></label>
+        <input class="fi" id="nm-title" type="text" placeholder="e.g. New Video Released!">
+      </div>
+
+      <div class="fg"><label class="fl">Message Body</label>
+        <textarea class="fta" id="nm-body" rows="3" placeholder="Details about this announcement..."></textarea>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="fg"><label class="fl">Link URL <span style="color:var(--txt3);font-weight:400">(optional)</span></label>
+          <input class="fi" id="nm-link-url" type="url" placeholder="https://...">
+        </div>
+        <div class="fg"><label class="fl">Link Label</label>
+          <input class="fi" id="nm-link-label" type="text" placeholder="Watch Now, Learn More...">
+        </div>
+      </div>
+
+      <div class="fg">
+        <label class="fl">Auto-Expire <span style="color:var(--txt3);font-weight:400">(optional)</span></label>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:8px" id="timer-presets">
+          <button class="maint-type-btn" onclick="setTimerPreset(1)">1 Hour</button>
+          <button class="maint-type-btn" onclick="setTimerPreset(6)">6 Hours</button>
+          <button class="maint-type-btn" onclick="setTimerPreset(24)">1 Day</button>
+          <button class="maint-type-btn" onclick="setTimerPreset(72)">3 Days</button>
+          <button class="maint-type-btn" onclick="setTimerPreset(168)">1 Week</button>
+          <button class="maint-type-btn" onclick="setTimerPreset(336)">2 Weeks</button>
+          <button class="maint-type-btn" onclick="setTimerPreset(720)">1 Month</button>
+          <button class="maint-type-btn" onclick="setTimerPreset(0)">No Expiry</button>
+        </div>
+        <input class="fi" id="nm-expires" type="datetime-local">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--txt3);margin-top:4px" id="nm-expires-preview"></div>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg3);border:1px solid var(--bdr);padding:12px 14px">
+        <div>
+          <div class="fl" style="margin-bottom:2px">Allow Dismiss</div>
+          <div style="font-size:.73rem;color:var(--txt3)">Visitors can close this notice</div>
+        </div>
+        <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer">
+          <input type="checkbox" id="nm-dismissible" checked style="opacity:0;width:0;height:0">
+          <span id="nm-dis-track" style="position:absolute;inset:0;background:rgba(62,240,184,.2);border:1px solid rgba(62,240,184,.4);transition:.3s">
+            <span id="nm-dis-thumb" style="position:absolute;top:3px;left:3px;width:16px;height:16px;background:var(--mint);transform:translateX(20px);transition:.3s"></span>
+          </span>
+        </label>
+      </div>
+
+    </div>
+    <div class="mf">
+      <button class="btn btn-ghost" onclick="closeNoticeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveNotice()" id="notice-save-btn">Save Notice</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
