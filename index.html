@@ -626,6 +626,20 @@ footer{background:var(--bg1);border-top:1px solid var(--bdr);padding:56px 60px 3
 .proj-emoji-fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
 .proj-img-wrap{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
 
+/* ── PROJECT DETAIL MODAL ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+@keyframes gearSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes ringPulse{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:.8;transform:scale(1.08)}}
+@keyframes dotBounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-10px)}}
+#pdModal .ptag{background:rgba(82,130,255,.12);border:1px solid rgba(82,130,255,.2);color:var(--blue2);font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.1em;padding:3px 10px}
+.pd-slide{position:absolute;inset:0;object-fit:cover;width:100%;height:100%;transition:opacity .4s}
+.pd-slide-video{position:absolute;inset:0;width:100%;height:100%;border:none}
+.pd-nav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.15);color:#fff;width:40px;height:40px;cursor:pointer;font-size:1.2rem;z-index:2;display:flex;align-items:center;justify-content:center;transition:background .2s}
+.pd-nav:hover{background:rgba(82,130,255,.5)}
+.pd-dot{width:8px;height:8px;border-radius:50%;background:var(--bdr2);cursor:pointer;transition:background .2s;flex-shrink:0}
+.pd-dot.on{background:var(--blue2)}
+.pd-status-pill{display:inline-flex;align-items:center;gap:5px;font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.1em;padding:4px 12px}
+
 /* ── RESPONSIVE ── */
 @media(max-width:1100px){
   .hero{grid-template-columns:1fr}
@@ -700,8 +714,8 @@ footer{background:var(--bg1);border-top:1px solid var(--bdr);padding:56px 60px 3
       <div><span class="code-cm">// Feature Designz Studio</span></div>
       <div><span class="code-kw">const</span> studio = {</div>
       <div>&nbsp;&nbsp;services: [<span class="code-str">'WebDev'</span>, <span class="code-str">'Mobile'</span>, <span class="code-str">'Design'</span>, <span class="code-str">'Video'</span>],</div>
-      <div>&nbsp;&nbsp;experience: <span class="code-num">3</span>+ <span class="code-cm">// years</span></div>
-      <div>&nbsp;&nbsp;projects: <span class="code-num">50</span>+, clients: <span class="code-fn">satisfied</span>()</div>
+      <div>&nbsp;&nbsp;experience: <span class="code-num" id="cb-years">3</span>+ <span class="code-cm">// years</span></div>
+      <div>&nbsp;&nbsp;projects: <span class="code-num" id="cb-projects">50</span>+, clients: <span class="code-fn">satisfied</span>()</div>
       <div>}</div>
     </div>
 
@@ -736,9 +750,9 @@ footer{background:var(--bg1);border-top:1px solid var(--bdr);padding:56px 60px 3
         <span class="pill">Premiere</span>
       </div>
       <div class="fc-metrics" style="margin-top:16px">
-        <div class="fc-m"><div class="fc-m-n">50+</div><div class="fc-m-l">Projects</div></div>
-        <div class="fc-m"><div class="fc-m-n">30+</div><div class="fc-m-l">Clients</div></div>
-        <div class="fc-m"><div class="fc-m-n">3+</div><div class="fc-m-l">Years</div></div>
+        <div class="fc-m"><div class="fc-m-n" id="hs-projects">50+</div><div class="fc-m-l">Projects</div></div>
+        <div class="fc-m"><div class="fc-m-n" id="hs-clients">30+</div><div class="fc-m-l">Clients</div></div>
+        <div class="fc-m"><div class="fc-m-n" id="hs-years">3+</div><div class="fc-m-l">Years</div></div>
       </div>
     </div>
 
@@ -1101,7 +1115,7 @@ footer{background:var(--bg1);border-top:1px solid var(--bdr);padding:56px 60px 3
     </div>
   </div>
   <div class="ft-bot">
-    <div class="ft-copy">© 2025 <em>Feature Designz</em>. Built with passion in Sri Lanka 🇱🇰</div>
+    <div class="ft-copy">© 2026 <em>Feature Designz</em>. Built with passion in Sri Lanka 🇱🇰</div>
     <div class="ft-ics">
       <a href="https://www.youtube.com/channel/UCda2mc_f-nIinjWpDUJiA2g" target="_blank" class="ft-ic" id="ft-yt"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg></a>
       <a href="https://www.instagram.com/featuredesignz" target="_blank" class="ft-ic" id="ft-ig"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>
@@ -1135,6 +1149,168 @@ window.addEventListener('scroll',()=>{
 });
 
 // Filter handled by unified loader below
+
+/* ── PROJECT DETAIL MODAL ── */
+let pdSlides   = [];
+let pdCurrent  = 0;
+
+const PD_STATUS_STYLE = {
+  inprogress:     { bg:'rgba(82,130,255,.15)',  color:'#7ba4ff', border:'rgba(82,130,255,.35)' },
+  update_soon:    { bg:'rgba(56,217,245,.12)',  color:'#38d9f5', border:'rgba(56,217,245,.3)'  },
+  uploading_soon: { bg:'rgba(245,200,66,.12)',  color:'#f5c842', border:'rgba(245,200,66,.3)'  },
+  updating:       { bg:'rgba(82,130,255,.15)',  color:'#7ba4ff', border:'rgba(82,130,255,.35)' },
+  updated:        { bg:'rgba(62,240,184,.12)',  color:'#3ef0b8', border:'rgba(62,240,184,.3)'  },
+  paused:         { bg:'rgba(74,88,128,.18)',   color:'#8899bb', border:'rgba(74,88,128,.3)'   },
+  completed:      { bg:'rgba(62,240,184,.1)',   color:'#3ef0b8', border:'rgba(62,240,184,.2)'  },
+};
+const PD_CAT_COLOR = { web:'#5282ff', mobile:'#f5c842', design:'#3ef0b8', video:'#f87171' };
+
+window.openProjectDetail = function(id) {
+  // Find from Firebase cache — stored globally
+  const p = window._fdProjects?.find(x => x.id === id);
+  if (!p) return;
+
+  // Build slides array: screenshots + video
+  pdSlides = [];
+  if (p.screenshots?.length) pdSlides.push(...p.screenshots.filter(Boolean));
+  else if (p.imageUrl) pdSlides.push(p.imageUrl);
+  if (p.videoUrl) pdSlides.push({ type:'video', src:p.videoUrl });
+  pdCurrent = 0;
+
+  // Populate fields
+  const CAT_LABEL = { web:'Web Development', mobile:'Mobile App', design:'Graphic Design', video:'Video Editing' };
+  document.getElementById('pd-cat').innerHTML     = `<span style="color:${PD_CAT_COLOR[p.cat]||'var(--blue)'}">${fdEsc(CAT_LABEL[p.cat]||p.cat||'')}</span>`;
+  document.getElementById('pd-name').textContent  = p.name  || '';
+  document.getElementById('pd-desc').textContent  = p.desc  || '';
+
+  // Status badge
+  const stBadgeEl = document.getElementById('pd-status-badge');
+  const stMap = PROJ_STATUS_MAP[p.status];
+  if (stMap && !p.hideStatus) {
+    const ss = PD_STATUS_STYLE[p.status] || {};
+    stBadgeEl.innerHTML = `<span class="pd-status-pill" style="background:${ss.bg};color:${ss.color};border:1px solid ${ss.border}">${stMap.icon} ${stMap.label}</span>`;
+  } else { stBadgeEl.innerHTML = ''; }
+
+  // Links
+  const urlEl = document.getElementById('pd-url');
+  const ghEl  = document.getElementById('pd-github');
+  if (p.url)       { urlEl.href = p.url; urlEl.style.display = ''; }
+  else               urlEl.style.display = 'none';
+  if (p.githubUrl) { ghEl.href = p.githubUrl; ghEl.style.display = ''; }
+  else               ghEl.style.display = 'none';
+
+  // Tags
+  const tagsEl = document.getElementById('pd-tags');
+  tagsEl.innerHTML = (p.tags||[]).map(t=>`<span class="ptag">${fdEsc(t)}</span>`).join('');
+
+  // Client
+  const clientRow = document.getElementById('pd-client-row');
+  if (p.client) { document.getElementById('pd-client').textContent = p.client; clientRow.style.display = ''; }
+  else clientRow.style.display = 'none';
+
+  // Notes (public-safe — only show if non-empty)
+  const notesRow = document.getElementById('pd-notes-row');
+  // Don't show internal notes publicly — leave hidden
+
+  // Render media
+  renderPdMedia();
+
+  // Show modal
+  document.getElementById('pdModal').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+};
+
+function renderPdMedia() {
+  const media = document.getElementById('pd-media');
+  const dots  = document.getElementById('pd-dots');
+  media.innerHTML = '';
+  dots.innerHTML  = '';
+
+  if (!pdSlides.length) {
+    media.innerHTML = `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:4rem;background:var(--bg1)">${'📁'}</div>`;
+    return;
+  }
+
+  pdSlides.forEach((s, i) => {
+    const isVid = typeof s === 'object' && s.type === 'video';
+    const src   = isVid ? s.src : s;
+    let el;
+    if (isVid) {
+      // YouTube embed or video tag
+      if (src.includes('youtube') || src.includes('youtu.be') || src.includes('vimeo')) {
+        el = document.createElement('iframe');
+        el.className   = 'pd-slide-video';
+        el.src         = src;
+        el.allow       = 'accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture';
+        el.allowFullscreen = true;
+      } else {
+        el = document.createElement('video');
+        el.className = 'pd-slide';
+        el.src       = src;
+        el.controls  = true;
+        el.style.objectFit = 'contain';
+        el.style.background = '#000';
+      }
+    } else {
+      el = document.createElement('img');
+      el.className = 'pd-slide';
+      el.src       = src;
+      el.alt       = 'Screenshot';
+      el.onerror   = () => { el.src = ''; el.style.display = 'none'; };
+    }
+    el.style.opacity = i === 0 ? '1' : '0';
+    el.style.position = 'absolute';
+    el.style.inset    = '0';
+    el.style.width    = '100%';
+    el.style.height   = '100%';
+    if (!isVid) el.style.objectFit = 'cover';
+    media.appendChild(el);
+
+    // Dot
+    const dot = document.createElement('div');
+    dot.className = i === 0 ? 'pd-dot on' : 'pd-dot';
+    dot.onclick   = () => goToSlide(i);
+    dots.appendChild(dot);
+  });
+
+  // Nav arrows (only if >1 slide)
+  if (pdSlides.length > 1) {
+    const prev = document.createElement('button');
+    prev.className = 'pd-nav';
+    prev.style.left = '10px';
+    prev.innerHTML  = '‹';
+    prev.onclick    = () => goToSlide((pdCurrent - 1 + pdSlides.length) % pdSlides.length);
+    const next = document.createElement('button');
+    next.className = 'pd-nav';
+    next.style.right = '10px';
+    next.innerHTML   = '›';
+    next.onclick     = () => goToSlide((pdCurrent + 1) % pdSlides.length);
+    media.appendChild(prev);
+    media.appendChild(next);
+  }
+
+  // Hide dots if only 1 slide
+  dots.style.display = pdSlides.length > 1 ? 'flex' : 'none';
+}
+
+function goToSlide(idx) {
+  const slides = document.getElementById('pd-media').querySelectorAll('.pd-slide, .pd-slide-video, video');
+  const dots   = document.getElementById('pd-dots').querySelectorAll('.pd-dot');
+  slides.forEach((s,i) => s.style.opacity = i===idx ? '1' : '0');
+  dots.forEach((d,i)   => d.classList.toggle('on', i===idx));
+  pdCurrent = idx;
+}
+
+window.closePdModal = function() {
+  document.getElementById('pdModal').style.display = 'none';
+  document.body.style.overflow = '';
+  // Pause any videos
+  document.querySelectorAll('#pd-media video').forEach(v => v.pause());
+  document.querySelectorAll('#pd-media iframe').forEach(f => { f.src = f.src; }); // stop youtube
+};
+
+// ESC key close
+document.addEventListener('keydown', e => { if (e.key==='Escape') closePdModal(); });
 
 
 // ══════════════════════════════════════
@@ -1347,6 +1523,11 @@ function fdEsc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;
       applyStudioStatus(d);
     });
 
+    // ── 6. HERO STATS ────────────────
+    onSnapshot(doc(db,'settings','heroStats'), snap => {
+      if (snap.exists()) applyHeroStats(snap.data());
+    });
+
     // ── 4. YOUTUBE ───────────────────
     onSnapshot(doc(db,'settings','youtube'), snap => {
       if (snap.exists()) applyYoutube(snap.data());
@@ -1355,6 +1536,11 @@ function fdEsc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;
     // ── 5. SOCIAL LINKS ──────────────
     onSnapshot(doc(db,'settings','social'), snap => {
       if (snap.exists()) applySocialLinks(snap.data());
+    });
+
+    // ── 7. MAINTENANCE MODE ──────────
+    onSnapshot(doc(db,'settings','maintenance'), snap => {
+      applyMaintenanceMode(snap.exists() ? snap.data() : { enabled:false });
     });
 
   } catch(e) {
@@ -1399,7 +1585,10 @@ function buildProjectCard(p) {
     <div class="pcard pcard-dyn" data-cat="${fdEsc(p.cat)}">
       <div class="pcard-thumb ${bg}" style="position:relative">
         ${thumb}
-        <div class="pcard-ov">${actions || '<span style="font-family:JetBrains Mono,monospace;font-size:.65rem;color:var(--txt3)">No link</span>'}</div>
+        <div class="pcard-ov" onclick="openProjectDetail('${p.id}')" style="cursor:pointer">
+          <button onclick="event.stopPropagation();openProjectDetail('${p.id}')" style="background:rgba(82,130,255,.25);border:1px solid rgba(82,130,255,.6);color:#fff;padding:9px 20px;font-family:'JetBrains Mono',monospace;font-size:.65rem;letter-spacing:.12em;cursor:pointer;margin-bottom:8px;width:100%">▶ View Details</button>
+          ${actions}
+        </div>
         ${cornerBadge}
       </div>
       <div class="pcard-body">
@@ -1419,6 +1608,7 @@ function renderProjectGrid(projects) {
   if (!grid) return;
 
   const visible = projects.filter(p => p.status !== 'off' && p.display !== false);
+  window._fdProjects = projects; // store for detail modal
 
   if (!visible.length) {
     grid.innerHTML = '';
@@ -1491,6 +1681,81 @@ function applyServiceBadge(sid, status) {
 // Default all available while loading
 ['web','mobile','design','video'].forEach(sid => applyServiceBadge(sid,'available'));
 
+// ── MAINTENANCE MODE ─────────────────
+const MAINT_COLORS = {
+  maintenance:'rgba(82,130,255,.8)',
+  update:     'rgba(62,240,184,.8)',
+  emergency:  'rgba(248,113,113,.8)',
+  holiday:    'rgba(245,200,66,.8)',
+};
+const MAINT_ICONS = { maintenance:'⚙️', update:'🚀', emergency:'🔴', holiday:'🎉' };
+
+function applyMaintenanceMode(data) {
+  const overlay = document.getElementById('maintOverlay');
+  if (!overlay) return;
+
+  if (!data.enabled) {
+    overlay.style.display = 'none';
+    document.body.style.overflow = '';
+    return;
+  }
+
+  // Show overlay
+  overlay.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+
+  const type  = data.type || 'maintenance';
+  const color = MAINT_COLORS[type] || MAINT_COLORS.maintenance;
+  const icon  = MAINT_ICONS[type]  || '⚙️';
+
+  // Update content
+  const setTxt = (id,v) => { const el=document.getElementById(id); if(el&&v) el.textContent=v; };
+  const setHtml= (id,v) => { const el=document.getElementById(id); if(el) el.innerHTML=v; };
+
+  setTxt('maint-page-title', data.title   || "We're Upgrading");
+  setTxt('maint-page-msg',   data.message || 'Back soon!');
+
+  // Gear icon
+  const gearEl = document.getElementById('maint-gear-icon');
+  if (gearEl) gearEl.textContent = icon;
+
+  // Type badge
+  const badgeEl = document.getElementById('maint-type-badge');
+  if (badgeEl) {
+    badgeEl.textContent = '● ' + (data.typeLabel || 'MAINTENANCE MODE').toUpperCase();
+    badgeEl.style.color       = color;
+    badgeEl.style.borderColor = color.replace('0.8','0.4');
+    badgeEl.style.background  = color.replace('0.8','0.08');
+  }
+
+  // ETA
+  const etaBox = document.getElementById('maint-page-eta');
+  const etaTxt = document.getElementById('maint-eta-text');
+  if (etaBox) etaBox.style.display = data.eta ? 'block' : 'none';
+  if (etaTxt && data.eta) etaTxt.textContent = data.eta;
+
+  // Contact
+  const contactBox = document.getElementById('maint-page-contact');
+  const emailLink  = document.getElementById('maint-email-link');
+  if (contactBox) contactBox.style.display = data.email ? 'block' : 'none';
+  if (emailLink && data.email) {
+    emailLink.href        = 'mailto:' + data.email;
+    emailLink.textContent = data.email;
+  }
+}
+
+// ── HERO STATS ───────────────────────
+function applyHeroStats(data) {
+  const set = (id, val) => { const el=document.getElementById(id); if(el&&val) el.textContent=val; };
+  set('hs-projects', data.projects || '50+');
+  set('hs-clients',  data.clients  || '30+');
+  set('hs-years',    data.years    || '3+');
+  // Sync code block numbers (strip non-digits for the code block)
+  const setNum = (id, val) => { const el=document.getElementById(id); if(el&&val) el.textContent=String(val).replace(/[^0-9]/g,''); };
+  setNum('cb-projects', data.projects || '50');
+  setNum('cb-years',    data.years    || '3');
+}
+
 // ── STUDIO STATUS ────────────────────
 function applyStudioStatus(data) {
   const status = data.status || 'available';
@@ -1536,5 +1801,113 @@ function applySocialLinks(data) {
 }
 
 </script>
+  <!-- MAINTENANCE MODE OVERLAY -->
+  <div id="maintOverlay" style="display:none;position:fixed;inset:0;z-index:99999;background:linear-gradient(135deg,#020510 0%,#050c1e 50%,#020510 100%);flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px">
+
+    <!-- Animated gear -->
+    <div style="position:relative;width:120px;height:120px;margin-bottom:32px">
+      <!-- Outer gear -->
+      <svg id="gear-outer" width="120" height="120" viewBox="0 0 120 120" style="position:absolute;inset:0;animation:gearSpin 8s linear infinite">
+        <path fill="none" stroke="rgba(82,130,255,0.6)" stroke-width="4" d="M60 10 L65 2 L75 2 L80 10 Q90 12 98 18 L107 16 L113 24 L108 32 Q114 40 116 50 L124 55 L124 65 L116 70 Q114 80 108 88 L113 96 L107 104 L98 102 Q90 108 80 110 L75 118 L65 118 L60 110 Q50 108 42 102 L33 104 L27 96 L32 88 Q26 80 24 70 L16 65 L16 55 L24 50 Q26 40 32 32 L27 24 L33 16 L42 18 Q50 12 60 10Z" transform="scale(0.5) translate(60,60)"/>
+      </svg>
+      <!-- Main gear icon -->
+      <div id="maint-gear-icon" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:3.5rem;animation:gearSpin 6s linear infinite">⚙️</div>
+      <!-- Pulse ring -->
+      <div style="position:absolute;inset:-10px;border:2px solid rgba(82,130,255,.3);border-radius:50%;animation:ringPulse 2s ease infinite"></div>
+    </div>
+
+    <!-- Status badge -->
+    <div id="maint-type-badge" style="font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;padding:5px 16px;border:1px solid rgba(82,130,255,.4);background:rgba(82,130,255,.1);color:#7ba4ff;margin-bottom:20px">
+      ● MAINTENANCE MODE
+    </div>
+
+    <!-- Title -->
+    <h1 id="maint-page-title" style="font-family:'Bricolage Grotesque',sans-serif;font-weight:900;font-size:2.2rem;color:#fff;margin:0 0 14px;max-width:500px;line-height:1.2">
+      We're Upgrading Our Studio
+    </h1>
+
+    <!-- Message -->
+    <p id="maint-page-msg" style="font-family:'Inter',sans-serif;font-size:.95rem;color:rgba(255,255,255,.5);max-width:480px;line-height:1.8;margin:0 0 24px">
+      Our website is currently undergoing scheduled maintenance and upgrades. We'll be back shortly with an improved experience.
+    </p>
+
+    <!-- ETA badge -->
+    <div id="maint-page-eta" style="display:none;font-family:'JetBrains Mono',monospace;font-size:.72rem;letter-spacing:.12em;padding:8px 22px;border:1px solid rgba(62,240,184,.35);background:rgba(62,240,184,.08);color:#3ef0b8;margin-bottom:24px">
+      ⏱ <span id="maint-eta-text"></span>
+    </div>
+
+    <!-- Contact -->
+    <div id="maint-page-contact" style="display:none;font-family:'JetBrains Mono',monospace;font-size:.65rem;color:rgba(255,255,255,.35);letter-spacing:.1em">
+      CONTACT: <a id="maint-email-link" href="" style="color:rgba(82,130,255,.7);text-decoration:none"></a>
+    </div>
+
+    <!-- Animated dots -->
+    <div style="display:flex;gap:8px;margin-top:32px">
+      <div style="width:6px;height:6px;border-radius:50%;background:rgba(82,130,255,.6);animation:dotBounce 1.4s ease infinite"></div>
+      <div style="width:6px;height:6px;border-radius:50%;background:rgba(82,130,255,.6);animation:dotBounce 1.4s ease .2s infinite"></div>
+      <div style="width:6px;height:6px;border-radius:50%;background:rgba(82,130,255,.6);animation:dotBounce 1.4s ease .4s infinite"></div>
+    </div>
+
+    <!-- Scan lines effect -->
+    <div style="position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px);z-index:1"></div>
+  </div>
+
+  <!-- PROJECT DETAIL MODAL -->
+  <div id="pdModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(2,5,16,.92);backdrop-filter:blur(12px);overflow-y:auto;padding:20px" onclick="if(event.target===this)closePdModal()">
+    <div id="pdBox" style="max-width:900px;margin:40px auto;background:var(--bg2);border:1px solid var(--bdr2);position:relative;animation:fadeUp .35s ease">
+      <!-- Close -->
+      <button onclick="closePdModal()" style="position:absolute;top:14px;right:16px;z-index:2;background:rgba(255,255,255,.06);border:1px solid var(--bdr);color:var(--txt2);width:32px;height:32px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center">✕</button>
+
+      <!-- MEDIA SECTION -->
+      <div id="pd-media" style="position:relative;background:var(--bg1);aspect-ratio:16/9;overflow:hidden">
+        <!-- filled by JS -->
+      </div>
+
+      <!-- GALLERY DOTS -->
+      <div id="pd-dots" style="display:flex;justify-content:center;gap:6px;padding:10px 0;background:var(--bg1)"></div>
+
+      <!-- BODY -->
+      <div style="padding:28px 32px">
+        <!-- top row -->
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px">
+          <div>
+            <div id="pd-cat" style="font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.18em;text-transform:uppercase;margin-bottom:8px"></div>
+            <h2 id="pd-name" style="font-family:'Bricolage Grotesque',sans-serif;font-size:1.6rem;font-weight:800;margin:0 0 10px"></h2>
+            <div id="pd-status-badge" style="display:inline-block;margin-bottom:12px"></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-shrink:0">
+            <a id="pd-url" href="#" target="_blank" style="display:none;padding:10px 20px;background:var(--blue);color:#fff;font-family:'JetBrains Mono',monospace;font-size:.7rem;letter-spacing:.1em;text-decoration:none;text-transform:uppercase">View Live →</a>
+            <a id="pd-github" href="#" target="_blank" style="display:none;padding:10px 20px;background:transparent;border:1px solid var(--mint);color:var(--mint);font-family:'JetBrains Mono',monospace;font-size:.7rem;letter-spacing:.1em;text-decoration:none;text-transform:uppercase">GitHub →</a>
+          </div>
+        </div>
+
+        <p id="pd-desc" style="font-size:.92rem;color:var(--txt2);line-height:1.8;margin-bottom:20px"></p>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:20px">
+          <div id="pd-client-row" style="display:none">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:.55rem;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3);margin-bottom:5px">Client</div>
+            <div id="pd-client" style="font-size:.88rem;color:var(--txt)"></div>
+          </div>
+          <div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:.55rem;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3);margin-bottom:5px">Technologies</div>
+            <div id="pd-tags" style="display:flex;flex-wrap:wrap;gap:5px"></div>
+          </div>
+        </div>
+
+        <!-- Notes if any -->
+        <div id="pd-notes-row" style="display:none;background:var(--bg3);border-left:3px solid var(--blue);padding:12px 16px;margin-bottom:20px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:.55rem;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3);margin-bottom:5px">Project Notes</div>
+          <div id="pd-notes" style="font-size:.86rem;color:var(--txt2);line-height:1.7"></div>
+        </div>
+
+        <!-- CTA -->
+        <div style="border-top:1px solid var(--bdr);padding-top:20px;text-align:center">
+          <p style="font-size:.82rem;color:var(--txt3);margin-bottom:14px">Interested in a similar project?</p>
+          <a href="#contact" onclick="closePdModal()" style="display:inline-block;padding:12px 32px;background:linear-gradient(135deg,var(--blue),var(--cyan));color:#020510;font-family:'JetBrains Mono',monospace;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;font-weight:700">Start Your Project →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
