@@ -250,6 +250,7 @@ function initApp(user, role) {
   subscribeHeroStats();
   subscribeMaintenanceMode();
   subscribeNotices();
+  subscribePopup();
   if (role === 'main_admin') subscribeAdmins();
 
   // Show dashboard
@@ -801,7 +802,7 @@ window.gotoPage = function(id) {
   document.querySelectorAll('.sb-it').forEach(i => {
     if (i.getAttribute('onclick')?.includes("'" + id + "'")) i.classList.add('on');
   });
-  const titles = { dashboard:'Dashboard', projects:'All Projects', project_view:'Projects Overview', messages:'Messages', website:'Website Overview', herostats:'Hero Stats', maintenance:'Maintenance Mode', notices:'Notices & Announcements', studio:'Studio Status', services:'Services Status', youtube:'YouTube Section', social:'Social Media Links', admins:'Admin Management', settings:'Settings' };
+  const titles = { dashboard:'Dashboard', projects:'All Projects', project_view:'Projects Overview', messages:'Messages', website:'Website Overview', herostats:'Hero Stats', maintenance:'Maintenance Mode', notices:'Notices & Announcements', studio:'Studio Status', services:'Services Status', youtube:'YouTube Section', social:'Social Media Links', popup:'Popup Message', admins:'Admin Management', settings:'Settings' };
   const el = document.getElementById('tb-title');
   if (el) el.textContent = titles[id] || id;
   if (id === 'dashboard') renderDash();
@@ -814,6 +815,7 @@ window.gotoPage = function(id) {
   if (id === 'services') renderServicePage();
   if (id === 'youtube')  renderYoutubePage();
   if (id === 'social')   renderSocialPage();
+  if (id === 'popup')    renderPopupPage();
   if (id === 'messages') renderMessages();
   if (id === 'projects') renderProjects();
 };
@@ -1325,6 +1327,11 @@ tr:hover td{background:rgba(82,130,255,.03)}
         <svg class="sb-ico" viewBox="0 0 24 24" fill="currentColor"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>
         Social Media Links
       </div>
+      <div class="sb-it" onclick="gotoPage('popup')">
+        <svg class="sb-ico" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
+        Popup Message
+      </div>
+
       <div class="sb-sec">System</div>
       <div class="sb-it" id="tab-admins" onclick="gotoPage('admins')" style="display:none">
         <svg class="sb-ico" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/></svg>
@@ -1999,7 +2006,106 @@ tr:hover td{background:rgba(82,130,255,.03)}
           </div>
 
         </div>
+      
+      <!-- POPUP MESSAGE PAGE -->
+      <div class="page" id="page-popup">
+        <div class="ph">
+          <div class="ph-title">Popup <em>Message</em></div>
+        </div>
+
+        <div style="max-width:720px">
+          <!-- INFO BOX -->
+          <div style="background:rgba(82,130,255,.07);border:1px solid rgba(82,130,255,.2);padding:14px 18px;margin-bottom:22px;font-size:.84rem;color:var(--txt2);display:flex;align-items:center;gap:12px">
+            <span style="font-size:1.4rem">💬</span>
+            <div>This popup will appear on the website <strong style="color:var(--txt)">5 seconds</strong> after page load. You can add an image or video, title, message, and a call-to-action button.</div>
+          </div>
+
+          <!-- ENABLE TOGGLE -->
+          <div style="background:var(--bg2);border:1px solid var(--bdr);padding:18px 20px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div style="font-weight:700;font-size:.95rem;margin-bottom:3px">Enable Popup</div>
+              <div style="font-size:.78rem;color:var(--txt3)">Show this popup to visitors</div>
+            </div>
+            <label style="position:relative;display:inline-block;width:52px;height:28px;cursor:pointer">
+              <input type="checkbox" id="popup-enabled" style="opacity:0;width:0;height:0" onchange="updatePopupToggle(this.checked)">
+              <span id="popup-track" style="position:absolute;inset:0;background:var(--bg4);border:1px solid var(--bdr);transition:.3s">
+                <span id="popup-thumb" style="position:absolute;top:4px;left:4px;width:18px;height:18px;background:var(--txt3);transition:.3s"></span>
+              </span>
+            </label>
+          </div>
+
+          <!-- DELAY -->
+          <div style="background:var(--bg2);border:1px solid var(--bdr);padding:18px 20px;margin-bottom:14px">
+            <div style="font-weight:600;margin-bottom:12px">Delay (seconds)</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap" id="popup-delay-btns">
+              <button class="maint-type-btn active" onclick="setPopupDelay(this,3)">3s</button>
+              <button class="maint-type-btn" onclick="setPopupDelay(this,5)">5s</button>
+              <button class="maint-type-btn" onclick="setPopupDelay(this,8)">8s</button>
+              <button class="maint-type-btn" onclick="setPopupDelay(this,10)">10s</button>
+              <button class="maint-type-btn" onclick="setPopupDelay(this,15)">15s</button>
+              <button class="maint-type-btn" onclick="setPopupDelay(this,30)">30s</button>
+            </div>
+            <input type="hidden" id="popup-delay-val" value="5">
+          </div>
+
+          <!-- MEDIA -->
+          <div style="background:var(--bg2);border:1px solid var(--bdr);padding:18px 20px;margin-bottom:14px">
+            <div style="font-weight:600;margin-bottom:12px">Media (Image or Video)</div>
+            <div style="display:flex;gap:8px;margin-bottom:10px" id="popup-media-type-btns">
+              <button class="maint-type-btn active" onclick="setPopupMediaType(this,'none')">None</button>
+              <button class="maint-type-btn" onclick="setPopupMediaType(this,'image')">🖼 Image</button>
+              <button class="maint-type-btn" onclick="setPopupMediaType(this,'video')">🎬 Video</button>
+            </div>
+            <div id="popup-media-url-row" style="display:none">
+              <label class="fl">Media URL</label>
+              <input class="fi" id="popup-media-url" type="url" placeholder="https://... (image or YouTube/video URL)">
+              <div style="font-size:.72rem;color:var(--txt3);margin-top:4px">Image: direct .jpg/.png/.webp URL &nbsp;|&nbsp; Video: YouTube URL or direct .mp4 URL</div>
+            </div>
+          </div>
+
+          <!-- CONTENT -->
+          <div style="background:var(--bg2);border:1px solid var(--bdr);padding:18px 20px;margin-bottom:14px">
+            <div style="font-weight:600;margin-bottom:12px">Content</div>
+            <div class="fg" style="margin-bottom:12px">
+              <label class="fl">Title</label>
+              <input class="fi" id="popup-title" type="text" placeholder="e.g. 🎉 Special Announcement!">
+            </div>
+            <div class="fg" style="margin-bottom:12px">
+              <label class="fl">Message</label>
+              <textarea class="fta" id="popup-body" rows="3" placeholder="Your message to visitors..."></textarea>
+            </div>
+          </div>
+
+          <!-- CTA BUTTON -->
+          <div style="background:var(--bg2);border:1px solid var(--bdr);padding:18px 20px;margin-bottom:22px">
+            <div style="font-weight:600;margin-bottom:12px">Call-to-Action Button <span style="color:var(--txt3);font-weight:400;font-size:.82rem">(optional)</span></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="fg">
+                <label class="fl">Button Label</label>
+                <input class="fi" id="popup-btn-label" type="text" placeholder="e.g. Watch Now, Learn More...">
+              </div>
+              <div class="fg">
+                <label class="fl">Button URL</label>
+                <input class="fi" id="popup-btn-url" type="url" placeholder="https://...">
+              </div>
+            </div>
+          </div>
+
+          <!-- SAVE -->
+          <button class="btn btn-primary" onclick="savePopupSettings()" id="popup-save-btn" style="width:100%;padding:14px">
+            💾 Save Popup Settings
+          </button>
+
+          <!-- PREVIEW -->
+          <div style="margin-top:14px;text-align:center">
+            <button class="btn btn-ghost" onclick="previewPopup()" style="font-size:.82rem">
+              👁 Preview Popup
+            </button>
+          </div>
+        </div>
       </div>
+
+</div>
 
       <!-- SETTINGS -->
       <div class="page" id="page-settings">
@@ -3485,6 +3591,162 @@ window.openNoticeModal = function(id) {
 window.closeNoticeModal = function() {
   var m = document.getElementById('noticeModal');
   if (m) { m.style.display = 'none'; document.body.style.overflow = ''; }
+};
+
+
+/* ══════════════════════════════════════
+   POPUP MESSAGE SYSTEM
+══════════════════════════════════════ */
+let popupDelayVal = 5;
+let popupMediaType = 'none';
+
+function subscribePopup() {
+  const _db = window.__db;
+  if (!_db) { setTimeout(subscribePopup, 600); return; }
+  const { doc, onSnapshot } = window.__fbModules;
+  onSnapshot(doc(_db, 'settings', 'popup'), snap => {
+    if (snap.exists()) {
+      const d = snap.data();
+      renderPopupPage(d);
+    }
+  }, () => {});
+}
+
+function renderPopupPage(data) {
+  if (!data) return;
+  const en = document.getElementById('popup-enabled');
+  if (en) {
+    en.checked = data.enabled === true;
+    updatePopupToggle(data.enabled === true);
+  }
+  const delayVal = data.delay || 5;
+  popupDelayVal = delayVal;
+  document.querySelectorAll('#popup-delay-btns .maint-type-btn').forEach(b => {
+    b.classList.remove('active');
+    if (parseInt(b.textContent) === delayVal) b.classList.add('active');
+  });
+  const dv = document.getElementById('popup-delay-val');
+  if (dv) dv.value = delayVal;
+
+  const mt = data.mediaType || 'none';
+  popupMediaType = mt;
+  document.querySelectorAll('#popup-media-type-btns .maint-type-btn').forEach(b => b.classList.remove('active'));
+  const activeBtn = document.querySelector('#popup-media-type-btns .maint-type-btn[onclick*="\'' + mt + '\'"]');
+  if (activeBtn) activeBtn.classList.add('active');
+  const urlRow = document.getElementById('popup-media-url-row');
+  if (urlRow) urlRow.style.display = mt !== 'none' ? 'block' : 'none';
+  const mu = document.getElementById('popup-media-url');
+  if (mu) mu.value = data.mediaUrl || '';
+
+  const fi = (id, val) => { const el=document.getElementById(id); if(el) el.value=val||''; };
+  fi('popup-title', data.title);
+  fi('popup-body', data.body);
+  fi('popup-btn-label', data.btnLabel);
+  fi('popup-btn-url', data.btnUrl);
+}
+
+window.updatePopupToggle = function(checked) {
+  const track = document.getElementById('popup-track');
+  const thumb = document.getElementById('popup-thumb');
+  if (!track || !thumb) return;
+  track.style.background  = checked ? 'rgba(62,240,184,0.2)' : 'var(--bg4)';
+  track.style.borderColor = checked ? 'rgba(62,240,184,0.4)' : 'var(--bdr)';
+  thumb.style.background  = checked ? 'var(--mint)' : 'var(--txt3)';
+  thumb.style.transform   = checked ? 'translateX(24px)' : 'translateX(0)';
+};
+
+window.setPopupDelay = function(btn, val) {
+  document.querySelectorAll('#popup-delay-btns .maint-type-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  popupDelayVal = val;
+  const dv = document.getElementById('popup-delay-val');
+  if (dv) dv.value = val;
+};
+
+window.setPopupMediaType = function(btn, type) {
+  document.querySelectorAll('#popup-media-type-btns .maint-type-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  popupMediaType = type;
+  const row = document.getElementById('popup-media-url-row');
+  if (row) row.style.display = type !== 'none' ? 'block' : 'none';
+};
+
+window.savePopupSettings = async function() {
+  const _db = window.__db;
+  if (!_db) { toast('DB not ready', 'error'); return; }
+  const { doc, setDoc, serverTimestamp } = window.__fbModules;
+  const enabled   = document.getElementById('popup-enabled')?.checked || false;
+  const delay     = parseInt(document.getElementById('popup-delay-val')?.value) || 5;
+  const mediaUrl  = document.getElementById('popup-media-url')?.value?.trim() || '';
+  const title     = document.getElementById('popup-title')?.value?.trim() || '';
+  const body      = document.getElementById('popup-body')?.value?.trim() || '';
+  const btnLabel  = document.getElementById('popup-btn-label')?.value?.trim() || '';
+  const btnUrl    = document.getElementById('popup-btn-url')?.value?.trim() || '';
+  const btn = document.getElementById('popup-save-btn');
+  try {
+    if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
+    await setDoc(doc(_db, 'settings', 'popup'), {
+      enabled, delay, mediaType: popupMediaType, mediaUrl,
+      title, body, btnLabel, btnUrl, updatedAt: serverTimestamp()
+    });
+    toast('Popup settings saved ✓', 'success');
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.textContent = '💾 Save Popup Settings'; btn.disabled = false; }
+  }
+};
+
+window.previewPopup = function() {
+  const title    = document.getElementById('popup-title')?.value?.trim() || 'Preview Title';
+  const body     = document.getElementById('popup-body')?.value?.trim() || 'Preview message.';
+  const mediaUrl = document.getElementById('popup-media-url')?.value?.trim() || '';
+  const btnLabel = document.getElementById('popup-btn-label')?.value?.trim() || '';
+  const btnUrl   = document.getElementById('popup-btn-url')?.value?.trim() || '';
+  showFdPopup({ enabled:true, delay:0, mediaType: popupMediaType, mediaUrl, title, body, btnLabel, btnUrl }, true);
+};
+
+// Generic popup renderer (used for preview AND called from index.html via __fbModules pattern)
+window.showFdPopup = function(data, isPreview) {
+  const existing = document.getElementById('fd-popup-overlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'fd-popup-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9500;background:rgba(2,5,16,.88);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px);animation:fadeIn .3s ease';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+  let mediaHtml = '';
+  if (data.mediaType === 'image' && data.mediaUrl) {
+    mediaHtml = `<img src="${data.mediaUrl}" style="width:100%;max-height:240px;object-fit:cover;display:block" onerror="this.style.display='none'">`;
+  } else if (data.mediaType === 'video' && data.mediaUrl) {
+    const url = data.mediaUrl;
+    if (url.includes('youtube') || url.includes('youtu.be')) {
+      const vid = url.match(/(?:v=|youtu\.be\/)([^&?/]+)/)?.[1] || '';
+      mediaHtml = `<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden"><iframe src="https://www.youtube.com/embed/${vid}?autoplay=0" style="position:absolute;inset:0;width:100%;height:100%;border:none" allowfullscreen></iframe></div>`;
+    } else {
+      mediaHtml = `<video src="${url}" style="width:100%;max-height:240px;object-fit:cover" controls></video>`;
+    }
+  }
+
+  const btnHtml = data.btnLabel
+    ? `<a href="${data.btnUrl||'#'}" target="_blank" rel="noopener" style="display:inline-block;padding:11px 28px;background:linear-gradient(135deg,#5282ff,#38d9f5);color:#020510;font-weight:700;font-size:.88rem;text-decoration:none;margin-top:4px">${data.btnLabel} →</a>`
+    : '';
+
+  overlay.innerHTML = `
+    <div style="background:var(--bg2,#0d1626);border:1px solid rgba(82,130,255,.35);max-width:500px;width:100%;max-height:90vh;overflow-y:auto;position:relative;animation:up .35s ease">
+      <button onclick="document.getElementById('fd-popup-overlay').remove();document.body.style.overflow=''" style="position:absolute;top:12px;right:12px;z-index:2;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;width:32px;height:32px;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center">&times;</button>
+      ${mediaHtml ? `<div style="overflow:hidden">${mediaHtml}</div>` : ''}
+      <div style="padding:24px 24px 28px">
+        ${isPreview ? '<div style="font-size:.65rem;font-family:JetBrains Mono,monospace;color:#f5c842;background:rgba(245,200,66,.1);border:1px solid rgba(245,200,66,.3);padding:3px 10px;display:inline-block;margin-bottom:10px;letter-spacing:.1em">PREVIEW MODE</div>' : ''}
+        ${data.title ? `<div style="font-family:Bricolage Grotesque,sans-serif;font-weight:800;font-size:1.35rem;color:#fff;margin-bottom:10px;line-height:1.2">${data.title}</div>` : ''}
+        ${data.body ? `<div style="font-size:.88rem;color:rgba(255,255,255,.7);line-height:1.65;margin-bottom:16px">${data.body}</div>` : ''}
+        ${btnHtml}
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  document.body.style.overflow = 'hidden';
 };
 
 document.addEventListener('DOMContentLoaded', () => {
