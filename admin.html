@@ -1004,6 +1004,7 @@ window.gotoPage = function(id) {
    HELPERS
 ══════════════════════════════════════ */
 const esc = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+window.esc = esc;
 
 function fmtTS(ts) {
   if (!ts) return '—';
@@ -1030,7 +1031,8 @@ function statusBadge(status, progress = 0) {
   if (status === 'inprogress')  return '<span class="badge b-blue">⟳ In Progress</span>';
   if (status === 'completed' || pct >= 100) return '<span class="badge b-mint">✓ Completed</span>';
   return '<span class="badge b-grey">' + (status || 'Unknown') + '</span>';
-}
+}window.statusBadge = statusBadge;
+
 
 window.openM   = id => document.getElementById(id)?.classList.add('open');
 window.closeM  = id => document.getElementById(id)?.classList.remove('open');
@@ -1263,7 +1265,8 @@ function subscribeActivity() {
 
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+}window.escHtml = escHtml;
+
 
 function timeAgo(date) {
   const diff = Date.now() - date.getTime();
@@ -3222,6 +3225,14 @@ tr:hover td{background:rgba(82,130,255,.03)}
 <div id="toast"><span id="t-ico">✓</span><span id="t-msg"></span></div>
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+// Aliases from module script
+var esc = window.esc || function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+var escHtml = window.escHtml || esc;
+var statusBadge = window.statusBadge || function(){return '';};
+var fmtTS = window.fmtTS || function(){return '—';};
+var projectsCache = window.projectsCache || [];
+var messagesCache = window.messagesCache || [];
+
 // Display toggle visual update
 function updateDisplayToggle(checked) {
   const track = document.getElementById('pe-display-track');
