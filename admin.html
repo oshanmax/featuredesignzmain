@@ -15,7 +15,8 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
-         onAuthStateChanged, GoogleAuthProvider, signInWithPopup }
+         onAuthStateChanged, GoogleAuthProvider, signInWithPopup,
+         createUserWithEmailAndPassword }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, doc, getDoc, getDocs, addDoc, updateDoc,
          deleteDoc, onSnapshot, serverTimestamp, query, orderBy, setDoc, where, Timestamp }
@@ -23,6 +24,9 @@ import { getFirestore, collection, doc, getDoc, getDocs, addDoc, updateDoc,
 
 // Expose modules globally for service status functions in regular <script>
 window.__fbModules = { doc, setDoc, serverTimestamp, onSnapshot, collection, addDoc, updateDoc, deleteDoc, getDocs, query, orderBy, where, Timestamp };
+window.__auth = auth;
+window.__createUser = createUserWithEmailAndPassword;
+window.__sendPassReset = sendPasswordResetEmail;
 window.__db = null; // will be set after init
 
 /* ══════════════════════════════════════
@@ -48,6 +52,7 @@ const SESSION_DAYS = 3; // auto-logout after 3 days
    INIT FIREBASE
 ══════════════════════════════════════ */
 const app  = initializeApp(firebaseConfig);
+window.__firebaseConfig = firebaseConfig; // expose for secondary app
 const auth = getAuth(app);
 const db   = getFirestore(app);
 window.__db = db; // expose globally
@@ -728,9 +733,10 @@ window.openAddAdminModal = function() {
   document.getElementById('adm-edit-id').value = '';
   document.getElementById('adm-modal-title').textContent = 'Add New Admin';
   document.getElementById('adm-modal-note').style.display = 'block';
-  ['adm-f-name','adm-f-email','adm-f-age','adm-f-dob','adm-f-companyid','adm-f-desc'].forEach(function(id) {
+  ['adm-f-name','adm-f-email','adm-f-age','adm-f-dob','adm-f-companyid','adm-f-desc','adm-f-pass','adm-f-pass2'].forEach(function(id) {
     var el = document.getElementById(id); if (el) el.value = '';
   });
+  var sr = document.getElementById('adm-f-sendreset'); if (sr) sr.checked = false;
   document.getElementById('adm-f-role').value   = 'admin';
   document.getElementById('adm-f-status').value = 'approved';
   document.getElementById('adm-f-email').readOnly = false;
@@ -753,13 +759,17 @@ window.openEditAdminModal = function(id) {
   document.getElementById('adm-f-desc').value         = a.description  || '';
   document.getElementById('adm-f-role').value         = a.role         || 'admin';
   document.getElementById('adm-f-status').value       = a.status       || 'approved';
+  // Hide password section in edit mode
+  var noteDiv = document.getElementById('adm-modal-note');
+  if (noteDiv) noteDiv.style.display = 'none';
   var m = document.getElementById('adminModal');
   if (m) { m.style.display = 'flex'; }
 };
 
 window.closeAdminModal = function() {
   var m = document.getElementById('adminModal');
-  if (m) m.style.display = 'none';
+  if (m) { m.style.display = 'none'; }
+  document.getElementById('adm-edit-id').value = '';
 };
 
 window.saveAdminDetails = async function() {
@@ -772,46 +782,90 @@ window.saveAdminDetails = async function() {
   var desc    = document.getElementById('adm-f-desc').value.trim();
   var role    = document.getElementById('adm-f-role').value;
   var status  = document.getElementById('adm-f-status').value;
+  var pass    = document.getElementById('adm-f-pass')  ? document.getElementById('adm-f-pass').value.trim()  : '';
+  var pass2   = document.getElementById('adm-f-pass2') ? document.getElementById('adm-f-pass2').value.trim() : '';
+  var sendReset = document.getElementById('adm-f-sendreset') ? document.getElementById('adm-f-sendreset').checked : false;
 
-  if (!name) { toast('Name is required', 'error'); return; }
+  if (!name)  { toast('Name is required', 'error'); return; }
   if (!editId && !email) { toast('Email is required', 'error'); return; }
+  if (!editId && !pass)  { toast('Password is required', 'error'); return; }
+  if (!editId && pass.length < 6) { toast('Password must be at least 6 characters', 'error'); return; }
+  if (!editId && pass !== pass2)  { toast('Passwords do not match', 'error'); return; }
 
-  var _db = window.__db;
-  if (!_db) { toast('DB not ready', 'error'); return; }
+  var _db  = window.__db;
+  var auth = window.__auth;
+  if (!_db)  { toast('DB not ready', 'error'); return; }
+  if (!editId && !auth) { toast('Auth not ready', 'error'); return; }
 
   var btn = document.getElementById('adm-save-btn');
   try {
-    if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
+    if (btn) { btn.innerHTML = 'Saving... <span style="font-size:.75rem">⏳</span>'; btn.disabled = true; }
 
     var data = {
       displayName: name,
-      age:         age     ? parseInt(age) : null,
-      dob:         dob     || null,
-      companyId:   compId  || null,
-      description: desc    || null,
+      age:         age    ? parseInt(age) : null,
+      dob:         dob    || null,
+      companyId:   compId || null,
+      description: desc   || null,
       role:        role,
       status:      status,
       updatedAt:   window.__fbModules.serverTimestamp()
     };
 
     if (editId) {
-      // Edit existing
+      /* ── EDIT existing admin ── */
       await window.__fbModules.updateDoc(window.__fbModules.doc(_db, 'admins', editId), data);
       await logActivity('✏️', 'Admin profile updated', name);
-      toast('Admin updated!', 'success');
+      toast('Admin updated! ✓', 'success');
+
     } else {
-      // Add new admin - use email as document ID (sanitized)
-      var docId = email.replace(/[^a-zA-Z0-9]/g, '_');
-      data.email        = email;
-      data.requestedAt  = window.__fbModules.serverTimestamp();
-      data.addedBy      = _currentAdminName || 'Main Admin';
-      await window.__fbModules.setDoc(window.__fbModules.doc(_db, 'admins', docId), data);
-      await logActivity('👤', 'Admin added', name + ' (' + email + ')');
-      toast('Admin added!', 'success');
+      /* ── ADD new admin: create Firebase Auth account ── */
+      if (btn) btn.innerHTML = 'Creating account... ⏳';
+
+      // Use secondary app instance so we don't sign out current admin
+      var { initializeApp: initApp2 } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
+      var { getAuth: getAuth2, createUserWithEmailAndPassword: createUser2 } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
+
+      var app2  = initApp2(window.__firebaseConfig, 'temp-create-' + Date.now());
+      var auth2 = getAuth2(app2);
+
+      var cred  = await createUser2(auth2, email, pass);
+      var uid   = cred.user.uid;
+
+      // Sign out from secondary app immediately
+      await auth2.signOut();
+
+      // Save to Firestore using UID as doc ID
+      data.email       = email;
+      data.requestedAt = window.__fbModules.serverTimestamp();
+      data.addedBy     = _currentAdminName || 'Main Admin';
+      await window.__fbModules.setDoc(window.__fbModules.doc(_db, 'admins', uid), data);
+
+      // Send password reset email if requested
+      if (sendReset) {
+        if (btn) btn.innerHTML = 'Sending email... ⏳';
+        try {
+          await window.__sendPassReset(auth, email);
+          toast('Admin created & reset email sent! ✓', 'success');
+        } catch(e2) {
+          toast('Admin created! (Reset email failed: ' + e2.message + ')', 'info');
+        }
+      } else {
+        toast('Admin account created! ✓
+They can login with: ' + email, 'success');
+      }
+      await logActivity('👤', 'New admin account created', name + ' (' + email + ')');
     }
     closeAdminModal();
   } catch(e) {
-    toast('Error: ' + e.message, 'error');
+    var msg = e.message || '';
+    if (msg.includes('email-already-in-use')) {
+      toast('This email already has an account. Use a different email.', 'error');
+    } else if (msg.includes('weak-password')) {
+      toast('Password too weak. Use at least 6 characters.', 'error');
+    } else {
+      toast('Error: ' + msg, 'error');
+    }
   } finally {
     if (btn) { btn.innerHTML = '&#x1F4BE; Save Admin'; btn.disabled = false; }
   }
@@ -2111,7 +2165,7 @@ tr:hover td{background:rgba(82,130,255,.03)}
       </div>
 
       <!-- ADD / EDIT ADMIN MODAL -->
-      <div class="modal-bg" id="adminModal" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(2,5,16,.88);display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)">
+      <div class="modal-bg" id="adminModal" onclick="if(event.target===this)closeAdminModal()" style="position:fixed;inset:0;z-index:9000;background:rgba(2,5,16,.88);display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)">
         <div style="background:#0d1626;border:1px solid rgba(82,130,255,.35);max-width:560px;width:100%;max-height:90vh;overflow-y:auto">
           <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--bdr)">
             <div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.1rem" id="adm-modal-title">Add New Admin</div>
@@ -2169,8 +2223,26 @@ tr:hover td{background:rgba(82,130,255,.03)}
               </div>
             </div>
 
-            <div style="margin-top:8px;padding:10px 14px;background:rgba(82,130,255,.06);border:1px solid rgba(82,130,255,.15);font-size:.75rem;color:var(--txt3)" id="adm-modal-note">
-              &#x2139; The new admin must sign up with this email to access the panel. Their account will be pre-approved.
+            <!-- PASSWORD SECTION (add mode only) -->
+            <div id="adm-modal-note" style="margin-top:4px">
+              <div style="font-weight:600;font-size:.82rem;margin-bottom:8px;color:var(--txt2)">&#x1F511; Login Credentials</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">
+                <div class="fg">
+                  <label class="fl">Temporary Password *</label>
+                  <input class="fi" id="adm-f-pass" type="password" placeholder="Min 6 characters" autocomplete="new-password">
+                </div>
+                <div class="fg">
+                  <label class="fl">Confirm Password *</label>
+                  <input class="fi" id="adm-f-pass2" type="password" placeholder="Re-enter password" autocomplete="new-password">
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                <input type="checkbox" id="adm-f-sendreset" style="accent-color:var(--mint);width:14px;height:14px">
+                <label for="adm-f-sendreset" style="font-size:.78rem;color:var(--txt2);cursor:pointer">Also send password reset email to admin</label>
+              </div>
+              <div style="font-size:.7rem;color:var(--txt3);margin-top:6px;padding:8px 10px;background:rgba(62,240,184,.05);border:1px solid rgba(62,240,184,.15)">
+                &#x26A1; A Firebase account will be created for this email. The admin can login immediately with the password you set.
+              </div>
             </div>
 
             <div style="display:flex;gap:10px;margin-top:18px">
