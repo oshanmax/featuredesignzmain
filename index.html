@@ -2135,11 +2135,38 @@ function applyYoutube(data) {
   const descEl   = document.getElementById('yt-desc-txt');
   const btnEl    = document.getElementById('yt-subscribe-btn');
   const btnLabel = document.getElementById('yt-btn-label');
-  if (iframe   && data.embedUrl) iframe.src          = data.embedUrl;
-  if (headEl   && data.heading)  headEl.innerHTML    = data.heading;
-  if (descEl   && data.desc)     descEl.textContent  = data.desc;
-  if (btnEl    && data.channel)  btnEl.href          = data.channel;
-  if (btnLabel && data.btnTxt)   btnLabel.textContent = data.btnTxt;
+
+  // Convert any YouTube URL format to embed URL
+  function toEmbedUrl(url) {
+    if (!url) return null;
+    url = url.trim();
+    if (url.includes('/embed')) return url; // already embed
+    var vid = null;
+    // youtu.be/ID
+    var m1 = url.match(/youtu\.be\/([^?&\s]+)/);
+    if (m1) vid = m1[1];
+    // youtube.com/watch?v=ID
+    var m2 = url.match(/[?&]v=([^&\s]+)/);
+    if (m2) vid = m2[1];
+    // youtube.com/shorts/ID
+    var m3 = url.match(/\/shorts\/([^?&\s]+)/);
+    if (m3) vid = m3[1];
+    if (vid) return 'https://www.youtube.com/embed/' + vid;
+    return url; // fallback
+  }
+
+  // Support both old 'embedUrl' and new 'videoUrl' field names
+  var rawUrl = data.videoUrl || data.embedUrl || '';
+  var embedUrl = toEmbedUrl(rawUrl);
+
+  if (iframe && embedUrl) {
+    iframe.src = embedUrl;
+    iframe.removeAttribute('data-src');
+  }
+  if (headEl   && (data.heading))                headEl.innerHTML    = data.heading;
+  if (descEl   && (data.description || data.desc)) descEl.textContent = data.description || data.desc;
+  if (btnEl    && data.channel)                  btnEl.href          = data.channel;
+  if (btnLabel && data.btnTxt)                   btnLabel.textContent = data.btnTxt;
 }
 
 // ── SOCIAL LINKS ─────────────────────
