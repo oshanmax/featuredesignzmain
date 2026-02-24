@@ -1494,17 +1494,33 @@ function renderYoutubePage() {
 }
 
 window.updateYtPreview = function(url) {
-  const wrap  = document.getElementById('yt-preview-wrap');
-  const frame = document.getElementById('yt-preview-frame');
-  if (!wrap || !frame) return;
-  const ytId = url.match(/(?:v=|youtu\.be\/)([^&?/]+)/);
-  if (ytId) {
-    wrap.style.display = 'block';
-    frame.src = 'https://www.youtube.com/embed/' + ytId[1];
-  } else {
-    wrap.style.display = 'none';
+  const frame  = document.getElementById('yt-preview-frame');
+  const holder = document.getElementById('yt-preview-placeholder');
+  if (!frame) return;
+  if (!url || !url.trim()) {
+    frame.style.display = 'none';
     frame.src = '';
+    if (holder) holder.style.display = 'flex';
+    return;
   }
+  url = url.trim();
+  // Convert to embed URL
+  var embedUrl = url;
+  if (url.includes('/embed')) {
+    embedUrl = url;
+  } else {
+    var vid = null;
+    var m1 = url.match(/youtu\.be\/([^?&\s]+)/);
+    if (m1) vid = m1[1];
+    var m2 = url.match(/[?&]v=([^&\s]+)/);
+    if (m2) vid = m2[1];
+    var m3 = url.match(/\/shorts\/([^?&\s]+)/);
+    if (m3) vid = m3[1];
+    if (vid) embedUrl = 'https://www.youtube.com/embed/' + vid;
+  }
+  frame.src = embedUrl;
+  frame.style.display = 'block';
+  if (holder) holder.style.display = 'none';
 };
 
 window.saveYoutubeSettings = async function() {
@@ -2706,7 +2722,7 @@ tr:hover td{background:rgba(82,130,255,.03)}
               <div class="sp-title">Featured Video</div>
               <div class="fg">
                 <label class="fl">YouTube Video URL or Embed URL</label>
-                <input class="fi" id="yt-url" type="text" placeholder="https://www.youtube.com/watch?v=VIDEO_ID  or  https://www.youtube.com/embed/VIDEO_ID">
+                <input class="fi" id="yt-url" type="text" oninput="updateYtPreview(this.value)" placeholder="https://www.youtube.com/watch?v=VIDEO_ID  or  https://www.youtube.com/embed/VIDEO_ID">
                 <div style="font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--txt3);margin-top:4px;line-height:1.7">
                   Paste full YouTube URL (watch or embed) — auto-converts to embed.<br>
                   Example: <span style="color:var(--blue2)">https://www.youtube.com/watch?v=dQw4w9WgXcQ</span>
@@ -2748,12 +2764,20 @@ tr:hover td{background:rgba(82,130,255,.03)}
           <!-- LIVE PREVIEW -->
           <div class="sp" style="position:sticky;top:24px">
             <div class="sp-title">Live Preview</div>
-            <div id="yt-preview-wrap" style="background:var(--bg3);border:1px solid var(--bdr);overflow:hidden">
-              <div style="aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;background:var(--bg3)" id="yt-preview-frame">
-                <div style="text-align:center;color:var(--txt3)">
-                  <div style="font-size:2.5rem;margin-bottom:8px">▶</div>
-                  <div style="font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.1em">Video Preview</div>
+            <div id="yt-preview-wrap" style="background:var(--bg3);border:1px solid var(--bdr);overflow:hidden;position:relative">
+              <div style="aspect-ratio:16/9;position:relative;background:#000">
+                <!-- placeholder shown when no video -->
+                <div id="yt-preview-placeholder" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg3)">
+                  <div style="text-align:center;color:var(--txt3)">
+                    <div style="font-size:2.5rem;margin-bottom:8px">▶</div>
+                    <div style="font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.1em">Video Preview</div>
+                  </div>
                 </div>
+                <iframe id="yt-preview-frame" src="" frameborder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowfullscreen
+                  style="position:absolute;inset:0;width:100%;height:100%;display:none;border:none">
+                </iframe>
               </div>
             </div>
             <div style="margin-top:12px">
