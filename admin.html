@@ -68,6 +68,7 @@ Object.defineProperty(window, 'currentUser', { get: () => currentUser });
 Object.defineProperty(window, 'currentRole', { get: () => currentRole });
 let unsubMessages = null;
 let unsubProjects = null;
+let unsubAdmins   = null;
 
 /* ══════════════════════════════════════
    SESSION MANAGEMENT (3-day expiry)
@@ -313,6 +314,7 @@ function subscribeMessages() {
   const q = query(collection(db, 'messages'), orderBy('date', 'desc'));
   unsubMessages = onSnapshot(q, snap => {
     messagesCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    window.messagesCache = messagesCache;
     renderMessages();
     renderDash();
     updateBadge();
@@ -460,6 +462,7 @@ function subscribeProjects() {
   const q = query(collection(db, 'projects'), orderBy('createdAt', 'desc'));
   unsubProjects = onSnapshot(q, snap => {
     projectsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    window.projectsCache = projectsCache;
     renderProjects();
     renderDash();
     renderProjectsSection();
@@ -1010,7 +1013,8 @@ function fmtTS(ts) {
   else d = new Date(ts);
   if (isNaN(d)) return '—';
   return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
-}
+}window.fmtTS = fmtTS;
+
 
 const catL = { web:'Web Dev', mobile:'Mobile App', design:'Graphics Design', video:'Video Editing' };
 const catB = { web:'b-blue', mobile:'b-cyan', design:'b-gold', video:'b-pink' };
