@@ -744,7 +744,11 @@ window.openAddAdminModal = function() {
   document.getElementById('adm-f-status').value = 'approved';
   document.getElementById('adm-f-email').readOnly = false;
   var m = document.getElementById('adminModal');
-  if (m) { m.style.display = 'flex'; }
+  if (m) {
+    m.style.display = 'flex';
+    m.style.opacity = '1';
+    m.style.pointerEvents = 'all';
+  }
 };
 
 window.openEditAdminModal = function(id) {
@@ -766,12 +770,20 @@ window.openEditAdminModal = function(id) {
   var noteDiv = document.getElementById('adm-modal-note');
   if (noteDiv) noteDiv.style.display = 'none';
   var m = document.getElementById('adminModal');
-  if (m) { m.style.display = 'flex'; }
+  if (m) {
+    m.style.display = 'flex';
+    m.style.opacity = '1';
+    m.style.pointerEvents = 'all';
+  }
 };
 
 window.closeAdminModal = function() {
   var m = document.getElementById('adminModal');
-  if (m) { m.style.display = 'none'; }
+  if (m) {
+    m.style.opacity = '0';
+    m.style.pointerEvents = 'none';
+    setTimeout(function(){ m.style.display = 'none'; }, 300);
+  }
   document.getElementById('adm-edit-id').value = '';
 };
 
