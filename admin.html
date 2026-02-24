@@ -24,9 +24,6 @@ import { getFirestore, collection, doc, getDoc, getDocs, addDoc, updateDoc,
 
 // Expose modules globally for service status functions in regular <script>
 window.__fbModules = { doc, setDoc, serverTimestamp, onSnapshot, collection, addDoc, updateDoc, deleteDoc, getDocs, query, orderBy, where, Timestamp };
-window.__auth = auth;
-window.__createUser = createUserWithEmailAndPassword;
-window.__sendPassReset = sendPasswordResetEmail;
 window.__db = null; // will be set after init
 
 /* ══════════════════════════════════════
@@ -55,7 +52,10 @@ const app  = initializeApp(firebaseConfig);
 window.__firebaseConfig = firebaseConfig; // expose for secondary app
 const auth = getAuth(app);
 const db   = getFirestore(app);
-window.__db = db; // expose globally
+window.__db   = db;   // expose globally
+window.__auth = auth; // expose for admin creation
+window.__createUser   = createUserWithEmailAndPassword;
+window.__sendPassReset = sendPasswordResetEmail;
 const gProvider = new GoogleAuthProvider();
 
 /* ══════════════════════════════════════
@@ -851,8 +851,7 @@ window.saveAdminDetails = async function() {
           toast('Admin created! (Reset email failed: ' + e2.message + ')', 'info');
         }
       } else {
-        toast('Admin account created! ✓
-They can login with: ' + email, 'success');
+        toast('Admin account created! ✓  Login: ' + email, 'success');
       }
       await logActivity('👤', 'New admin account created', name + ' (' + email + ')');
     }
