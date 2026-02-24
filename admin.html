@@ -1015,8 +1015,7 @@ window.savePopupSettings = async () => {
   try {
     if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
     await m.setDoc(m.doc(db, 'settings', 'popup'), {
-    await logActivity('💬', 'Popup message saved', title || '');
-          enabled, delay, autoClose,
+      enabled, delay, autoClose,
       mediaType: _popMediaType, mediaUrl,
       title, body, btnLabel, btnUrl,
       showFrom:  fromVal  ? Ts.fromDate(new Date(fromVal))  : null,
@@ -1024,6 +1023,7 @@ window.savePopupSettings = async () => {
       updatedAt: m.serverTimestamp()
     });
     toast('Popup settings saved!', 'success');
+    await logActivity('💬', 'Popup message saved', title || '');
   } catch (e) {
     toast('Save failed: ' + e.message, 'error');
   } finally {
@@ -3975,7 +3975,6 @@ window.setStudioStatus = async function(status) {
       updatedAt: serverTimestamp(),
       updatedBy: window.currentUser?.email || 'admin'
     });
-    await logActivity('🎙️', 'Studio Status updated', '');
     await logActivity('🎙️', 'Studio Status updated', '');
     toast('Studio status → ' + s.label + ' ✓ Live!', 'success');
   } catch(e) { toast('Error: ' + e.message, 'error'); }
