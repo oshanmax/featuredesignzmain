@@ -18,8 +18,7 @@ import { getAuth, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
          onAuthStateChanged, GoogleAuthProvider, signInWithPopup }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, doc, getDoc, getDocs, addDoc, updateDoc,
-         deleteDoc, onSnapshot, serverTimestamp, query, orderBy, setDoc,
-         where, Timestamp }
+         deleteDoc, onSnapshot, serverTimestamp, query, orderBy, setDoc }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // Expose modules globally for service status functions in regular <script>
@@ -869,14 +868,274 @@ window.closeCfm = function() {
   document.getElementById('cfmDlg').classList.remove('open');
   cfmCb = null;
 };
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('cfm-ok').onclick = () => { if (cfmCb) cfmCb(); closeCfm(); };
-});
 
 
 /* ══════════════════════════════════════
-   NOTICE MODAL FUNCTIONS
+   POPUP MESSAGE SYSTEM
 ══════════════════════════════════════ */
+let _popDelay = 3, _popAutoClose = 0, _popMediaType = 'none';
+
+function subscribePopup() {
+  const db = window.__db;
+  if (!db) { setTimeout(subscribePopup, 600); return; }
+  const m = window.__fbModules;
+  m.onSnapshot(m.doc(db, 'settings', 'popup'), snap => {
+    renderPopupPage(snap.exists() ? snap.data() : {});
+  }, () => {});
+}
+
+function renderPopupPage(d = {}) {
+  const en = document.getElementById('popup-enabled');
+  if (en) { en.checked = d.enabled === true; updatePopupToggle(d.enabled === true); }
+
+  _popDelay = d.delay || 3;
+  document.querySelectorAll('#popup-delay-btns .maint-type-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.textContent) === _popDelay);
+  });
+  const dv = document.getElementById('popup-delay-val');
+  if (dv) dv.value = _popDelay;
+
+  _popAutoClose = d.autoClose || 0;
+  document.querySelectorAll('#popup-autoclose-btns .maint-type-btn').forEach(b => {
+    b.classList.toggle('active', (parseInt(b.textContent) || 0) === _popAutoClose);
+  });
+  const acv = document.getElementById('popup-autoclose-val');
+  if (acv) acv.value = _popAutoClose;
+  const aci = document.getElementById('popup-autoclose-info');
+  if (aci) aci.style.display = _popAutoClose > 0 ? 'block' : 'none';
+
+  _popMediaType = d.mediaType || 'none';
+  document.querySelectorAll('#popup-media-type-btns .maint-type-btn').forEach(b => {
+    b.classList.toggle('active', (b.getAttribute('onclick') || '').includes("'" + _popMediaType + "'"));
+  });
+  const mr = document.getElementById('popup-media-url-row');
+  if (mr) mr.style.display = _popMediaType !== 'none' ? 'block' : 'none';
+
+  const sv = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+  sv('popup-media-url', d.mediaUrl);
+  sv('popup-title',     d.title);
+  sv('popup-body',      d.body);
+  sv('popup-btn-label', d.btnLabel);
+  sv('popup-btn-url',   d.btnUrl);
+
+  const tsToLocal = ts => {
+    if (!ts) return '';
+    const ms = ts.toDate ? ts.toDate().getTime() : (ts.seconds ? ts.seconds * 1000 : 0);
+    if (!ms) return '';
+    return new Date(ms - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  };
+  sv('popup-from',  tsToLocal(d.showFrom));
+  sv('popup-until', tsToLocal(d.showUntil));
+
+  /* ── Update status bar ── */
+  const bar   = document.getElementById('popup-status-bar');
+  const stxt  = document.getElementById('popup-status-text');
+  const sbadge= document.getElementById('popup-status-badge');
+  if (bar && stxt && sbadge) {
+    const hasContent = d.title || d.body;
+    if (hasContent || d.enabled) {
+      bar.style.display = 'flex';
+      const schedInfo = d.showFrom || d.showUntil ? ' · Scheduled' : '';
+      const acInfo    = d.autoClose > 0 ? ' · Auto-close ' + d.autoClose + 's' : '';
+      stxt.textContent = (d.title ? '"' + d.title + '"' : 'Popup saved') + schedInfo + acInfo;
+      if (d.enabled) {
+        sbadge.textContent = 'LIVE';
+        sbadge.style.background  = 'rgba(62,240,184,.15)';
+        sbadge.style.color       = 'var(--mint)';
+        sbadge.style.border      = '1px solid rgba(62,240,184,.4)';
+      } else {
+        sbadge.textContent = 'DISABLED';
+        sbadge.style.background  = 'rgba(255,255,255,.04)';
+        sbadge.style.color       = 'var(--txt3)';
+        sbadge.style.border      = '1px solid var(--bdr)';
+      }
+    } else {
+      bar.style.display = 'none';
+    }
+  }
+}
+
+window.updatePopupToggle = on => {
+  const t = document.getElementById('popup-track');
+  const h = document.getElementById('popup-thumb');
+  if (!t || !h) return;
+  t.style.background  = on ? 'rgba(62,240,184,.2)' : 'var(--bg4)';
+  t.style.borderColor = on ? 'rgba(62,240,184,.4)' : 'var(--bdr)';
+  h.style.background  = on ? 'var(--mint)' : 'var(--txt3)';
+  h.style.transform   = on ? 'translateX(24px)' : 'translateX(0)';
+};
+
+window.setPopupDelay = (btn, val) => {
+  document.querySelectorAll('#popup-delay-btns .maint-type-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  _popDelay = val;
+  const el = document.getElementById('popup-delay-val'); if (el) el.value = val;
+};
+
+window.setPopupAutoClose = (btn, val) => {
+  document.querySelectorAll('#popup-autoclose-btns .maint-type-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  _popAutoClose = val;
+  const el  = document.getElementById('popup-autoclose-val'); if (el) el.value = val;
+  const aci = document.getElementById('popup-autoclose-info');
+  if (aci) aci.style.display = val > 0 ? 'block' : 'none';
+};
+
+window.setPopupMediaType = (btn, type) => {
+  document.querySelectorAll('#popup-media-type-btns .maint-type-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  _popMediaType = type;
+  const r = document.getElementById('popup-media-url-row');
+  if (r) r.style.display = type !== 'none' ? 'block' : 'none';
+};
+
+window.savePopupSettings = async () => {
+  const db = window.__db;
+  if (!db) { toast('DB not ready', 'error'); return; }
+  const m  = window.__fbModules;
+  const Ts = m.Timestamp;
+
+  const enabled   = document.getElementById('popup-enabled')?.checked || false;
+  const delay     = parseInt(document.getElementById('popup-delay-val')?.value) || 3;
+  const autoClose = parseInt(document.getElementById('popup-autoclose-val')?.value) || 0;
+  const mediaUrl  = document.getElementById('popup-media-url')?.value?.trim() || '';
+  const title     = document.getElementById('popup-title')?.value?.trim() || '';
+  const body      = document.getElementById('popup-body')?.value?.trim() || '';
+  const btnLabel  = document.getElementById('popup-btn-label')?.value?.trim() || '';
+  const btnUrl    = document.getElementById('popup-btn-url')?.value?.trim() || '';
+  const fromVal   = document.getElementById('popup-from')?.value || '';
+  const untilVal  = document.getElementById('popup-until')?.value || '';
+
+  const btn = document.getElementById('popup-save-btn');
+  try {
+    if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
+    await m.setDoc(m.doc(db, 'settings', 'popup'), {
+      enabled, delay, autoClose,
+      mediaType: _popMediaType, mediaUrl,
+      title, body, btnLabel, btnUrl,
+      showFrom:  fromVal  ? Ts.fromDate(new Date(fromVal))  : null,
+      showUntil: untilVal ? Ts.fromDate(new Date(untilVal)) : null,
+      updatedAt: m.serverTimestamp()
+    });
+    toast('Popup settings saved!', 'success');
+  } catch (e) {
+    toast('Save failed: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.innerHTML = '&#x1F4BE; Save Popup Settings'; btn.disabled = false; }
+  }
+};
+/* ── Reset popup form to blank state ── */
+window.resetPopupForm = function() {
+  if (!confirm('Reset all popup fields to blank? (This does not change saved settings)')) return;
+  renderPopupPage({});
+  toast('Form reset to blank', 'info');
+};
+
+/* ── Delete popup from Firestore ── */
+window.deletePopupSettings = async function() {
+  if (!confirm('Delete this popup permanently?\nThis will remove it from Firestore and stop showing it on the website.')) return;
+  const db = window.__db;
+  if (!db) { toast('DB not ready', 'error'); return; }
+  const m = window.__fbModules;
+  const btn = document.getElementById('popup-delete-btn');
+  try {
+    if (btn) { btn.textContent = 'Deleting...'; btn.disabled = true; }
+    await m.deleteDoc(m.doc(db, 'settings', 'popup'));
+    renderPopupPage({});  // clear form
+    toast('Popup deleted successfully', 'success');
+  } catch(e) {
+    toast('Delete failed: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.innerHTML = '&#x1F5D1; Delete Popup'; btn.disabled = false; }
+  }
+};
+
+
+
+window.previewPopup = () => {
+  showFdPopup({
+    enabled:   true,
+    autoClose: _popAutoClose,
+    mediaType: _popMediaType,
+    mediaUrl:  document.getElementById('popup-media-url')?.value?.trim() || '',
+    title:     document.getElementById('popup-title')?.value?.trim()     || 'Preview Title',
+    body:      document.getElementById('popup-body')?.value?.trim()      || 'This is a preview of your popup message.',
+    btnLabel:  document.getElementById('popup-btn-label')?.value?.trim() || '',
+    btnUrl:    document.getElementById('popup-btn-url')?.value?.trim()   || '',
+  }, true);
+};
+
+window.showFdPopup = (data, isPreview = false) => {
+  const ex = document.getElementById('fd-popup-overlay');
+  if (ex) { clearTimeout(ex._act); ex.remove(); }
+
+  /* Media */
+  let mediaHtml = '';
+  if (data.mediaType === 'image' && data.mediaUrl) {
+    mediaHtml = `<img src="${data.mediaUrl}" id="fdpimg" style="width:100%;max-height:260px;object-fit:cover;display:block">`;
+  } else if (data.mediaType === 'video' && data.mediaUrl) {
+    const url  = data.mediaUrl;
+    const ytId = url.match(/(?:v=|youtu\.be\/)([^&?/]+)/);
+    if (ytId) {
+      mediaHtml = `<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden"><iframe src="https://www.youtube.com/embed/${ytId[1]}" style="position:absolute;inset:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>`;
+    } else {
+      mediaHtml = `<video src="${url}" style="width:100%;max-height:260px;object-fit:cover" controls playsinline></video>`;
+    }
+  }
+
+  /* Auto-close bar */
+  const ac = parseInt(data.autoClose) || 0;
+  const barHtml = ac > 0
+    ? `<div style="height:4px;background:rgba(255,255,255,.1)"><div id="fdpbar" style="height:100%;width:100%;background:linear-gradient(90deg,#5282ff,#38d9f5)"></div></div>`
+    : '';
+
+  /* Content */
+  const badge = isPreview ? `<div style="font-size:.6rem;font-family:'JetBrains Mono',monospace;letter-spacing:.15em;color:#f5c842;background:rgba(245,200,66,.1);border:1px solid rgba(245,200,66,.3);padding:3px 10px;display:inline-block;margin-bottom:10px">PREVIEW</div>` : '';
+  const ttl   = data.title   ? `<div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.35rem;color:#fff;line-height:1.2;margin-bottom:10px;padding-right:24px">${data.title}</div>` : '';
+  const msg   = data.body    ? `<div style="font-size:.88rem;color:rgba(255,255,255,.7);line-height:1.65;margin-bottom:16px">${data.body}</div>` : '';
+  const cta   = data.btnLabel ? `<a href="${data.btnUrl || '#'}" target="_blank" rel="noopener" style="display:inline-block;padding:11px 28px;background:linear-gradient(135deg,#5282ff,#38d9f5);color:#020510;font-weight:700;font-size:.88rem;text-decoration:none">${data.btnLabel} &#x2192;</a>` : '';
+
+  const ov = document.createElement('div');
+  ov.id = 'fd-popup-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9500;background:rgba(2,5,16,.85);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+  ov.onclick = e => { if (e.target === ov) _closeFdPopup(); };
+
+  ov.innerHTML = `
+    <div style="background:#0d1626;border:1px solid rgba(82,130,255,.35);max-width:500px;width:100%;max-height:90vh;overflow-y:auto;position:relative">
+      <button onclick="_closeFdPopup()" style="position:absolute;top:12px;right:12px;z-index:2;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;width:32px;height:32px;border-radius:4px;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;line-height:1">&times;</button>
+      ${mediaHtml ? `<div>${mediaHtml}</div>` : ''}
+      <div style="padding:22px 24px 24px">${badge}${ttl}${msg}${cta}</div>
+      ${barHtml}
+    </div>`;
+
+  document.body.appendChild(ov);
+  document.body.style.overflow = 'hidden';
+
+  const img = ov.querySelector('#fdpimg');
+  if (img) img.onerror = () => img.style.display = 'none';
+
+  if (ac > 0) {
+    const bar = ov.querySelector('#fdpbar');
+    if (bar) requestAnimationFrame(() => {
+      bar.style.transition = `width ${ac}s linear`;
+      bar.style.width = '0%';
+    });
+    ov._act = setTimeout(_closeFdPopup, ac * 1000);
+  }
+};
+
+window._closeFdPopup = () => {
+  const ov = document.getElementById('fd-popup-overlay');
+  if (!ov) return;
+  clearTimeout(ov._act);
+  ov.style.opacity    = '0';
+  ov.style.transition = 'opacity .35s';
+  setTimeout(() => { ov.remove(); document.body.style.overflow = ''; }, 360);
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('cfm-ok').onclick = () => { if (cfmCb) cfmCb(); closeCfm(); };
+});
 
 let tTimer;
 window.toast = function(msg, type = 'success') {
@@ -1331,7 +1590,6 @@ tr:hover td{background:rgba(82,130,255,.03)}
         <svg class="sb-ico" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
         Popup Message
       </div>
-
       <div class="sb-sec">System</div>
       <div class="sb-it" id="tab-admins" onclick="gotoPage('admins')" style="display:none">
         <svg class="sb-ico" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/></svg>
@@ -1592,6 +1850,79 @@ tr:hover td{background:rgba(82,130,255,.03)}
         </div>
       </div>
 
+      <!-- NOTICE MODAL -->
+      <div class="modal-bg" id="noticeModal" style="display:none">
+        <div class="modal" style="max-width:580px">
+          <div class="mh">
+            <div class="mh-title" id="notice-modal-title">Add Notice</div>
+            <button class="mc-x" onclick="closeM('noticeModal')">✕</button>
+          </div>
+          <div class="mb" style="display:flex;flex-direction:column;gap:14px">
+
+            <div class="fg">
+              <label class="fl">Notice Type</label>
+              <div style="display:flex;gap:7px;flex-wrap:wrap" id="notice-type-btns">
+                <button class="maint-type-btn active" data-ntype="new"    onclick="selectNoticeType(this,'new')">✨ New</button>
+                <button class="maint-type-btn" data-ntype="update"  onclick="selectNoticeType(this,'update')">🔄 Update</button>
+                <button class="maint-type-btn" data-ntype="event"   onclick="selectNoticeType(this,'event')">📅 Event</button>
+                <button class="maint-type-btn" data-ntype="video"   onclick="selectNoticeType(this,'video')">🎬 Video</button>
+                <button class="maint-type-btn" data-ntype="info"    onclick="selectNoticeType(this,'info')">💡 Info</button>
+              </div>
+            </div>
+
+            <div class="fg"><label class="fl">Title</label>
+              <input class="fi" id="nm-title" type="text" placeholder="e.g. New Video Released!">
+            </div>
+
+            <div class="fg"><label class="fl">Message Body</label>
+              <textarea class="fta" id="nm-body" rows="3" placeholder="Details about this announcement..."></textarea>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="fg"><label class="fl">Link URL <span style="color:var(--txt3);font-weight:400">(optional)</span></label>
+                <input class="fi" id="nm-link-url" type="url" placeholder="https://...">
+              </div>
+              <div class="fg"><label class="fl">Link Label</label>
+                <input class="fi" id="nm-link-label" type="text" placeholder="Watch Now, Learn More...">
+              </div>
+            </div>
+
+            <div class="fg">
+              <label class="fl">Auto-Expire Timer <span style="color:var(--txt3);font-weight:400">(optional)</span></label>
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:8px" id="timer-presets">
+                <button class="maint-type-btn" onclick="setTimerPreset(1)">1 Hour</button>
+                <button class="maint-type-btn" onclick="setTimerPreset(6)">6 Hours</button>
+                <button class="maint-type-btn" onclick="setTimerPreset(24)">1 Day</button>
+                <button class="maint-type-btn" onclick="setTimerPreset(72)">3 Days</button>
+                <button class="maint-type-btn" onclick="setTimerPreset(168)">1 Week</button>
+                <button class="maint-type-btn" onclick="setTimerPreset(336)">2 Weeks</button>
+                <button class="maint-type-btn" onclick="setTimerPreset(720)">1 Month</button>
+                <button class="maint-type-btn" data-preset="0" onclick="setTimerPreset(0)">No Expiry</button>
+              </div>
+              <input class="fi" id="nm-expires" type="datetime-local" placeholder="Or pick exact date/time">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--txt3);margin-top:4px" id="nm-expires-preview"></div>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg3);border:1px solid var(--bdr);padding:12px 14px">
+              <div>
+                <div class="fl" style="margin-bottom:2px">Allow Dismiss</div>
+                <div style="font-size:.73rem;color:var(--txt3)">Visitors can close this notice</div>
+              </div>
+              <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer">
+                <input type="checkbox" id="nm-dismissible" checked style="opacity:0;width:0;height:0">
+                <span id="nm-dis-track" style="position:absolute;inset:0;background:rgba(62,240,184,.2);border:1px solid rgba(62,240,184,.4);transition:.3s">
+                  <span id="nm-dis-thumb" style="position:absolute;top:3px;left:3px;width:16px;height:16px;background:var(--mint);transform:translateX(20px);transition:.3s"></span>
+                </span>
+              </label>
+            </div>
+
+          </div>
+          <div class="mf">
+            <button class="btn btn-ghost" onclick="closeM('noticeModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveNotice()" id="notice-save-btn">Save Notice</button>
+          </div>
+        </div>
+      </div>
 
       <!-- MAINTENANCE MODE -->
       <div class="page" id="page-maintenance">
@@ -1933,6 +2264,150 @@ tr:hover td{background:rgba(82,130,255,.03)}
             ⚡ Save All & Update Live
           </button>
         </div>
+
+      <!-- POPUP MESSAGE PAGE -->
+      <div class="page" id="page-popup">
+        <div class="ph">
+          <div class="ph-title">Popup <em>Message</em></div>
+        </div>
+        <div style="max-width:720px">
+
+          <div id="popup-status-bar" style="display:none;background:rgba(62,240,184,.07);border:1px solid rgba(62,240,184,.25);padding:12px 18px;margin-bottom:14px;font-size:.8rem;color:var(--mint);display:none;align-items:center;justify-content:space-between;gap:12px">
+            <div id="popup-status-text"></div>
+            <div id="popup-status-badge" style="font-size:.7rem;padding:3px 10px;border-radius:2px;font-weight:700;letter-spacing:.05em"></div>
+          </div>
+
+          <div style="background:rgba(82,130,255,.07);border:1px solid rgba(82,130,255,.2);padding:14px 18px;margin-bottom:22px;font-size:.84rem;color:var(--txt2);display:flex;align-items:center;gap:12px">
+            <span style="font-size:1.4rem">&#x1F4AC;</span>
+            <div>Configure a popup message for your website visitors. Set a display schedule, auto-close timer, media, and content below.</div>
+          </div>
+
+          <!-- ENABLE TOGGLE -->
+          <div style="background:var(--bg2);border:1px solid var(--bdr);padding:18px 20px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div style="font-weight:700;font-size:.95rem;margin-bottom:3px">Enable Popup</div>
+              <div style="font-size:.78rem;color:var(--txt3)">Show this popup to website visitors</div>
+            </div>
+            <label style="position:relative;display:inline-block;width:52px;height:28px;cursor:pointer">
+              <input type="checkbox" id="popup-enabled" style="opacity:0;width:0;height:0" onchange="updatePopupToggle(this.checked)">
+              <span id="popup-track" style="position:absolute;inset:0;background:var(--bg4);border:1px solid var(--bdr);transition:.3s">
+                <span id="popup-thumb" style="position:absolute;top:4px;left:4px;width:18px;height:18px;background:var(--txt3);transition:.3s"></span>
+              </span>
+            </label>
+          </div>
+
+          <!-- SCHEDULE -->
+          <div style="background:var(--bg2);border:1px solid var(--bdr);padding:18px 20px;margin-bottom:14px">
+            <div style="font-weight:600;margin-bottom:4px">&#x1F4C5; Display Schedule <span style="color:var(--txt3);font-weight:400;font-size:.8rem">(optional)</span></div>
+            <div style="font-size:.75rem;color:var(--txt3);margin-bottom:14px">Leave both blank to always show when enabled</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="fg">
+                <label class="fl">Show From (date &amp; time)</label>
+                <input class="fi" id="popup-from" type="datetime-local" style="color-scheme:dark">
+                <div style="font-size:.7rem;color:var(--txt3);margin-top:3px">Popup starts appearing after this time</div>
+              </div>
+              <div class="fg">
+                <label class="fl">Show Until (date &amp; time)</label>
+                <input class="fi" id="popup-until" type="datetime-local" style="color-scheme:dark">
+                <div style="font-size:.7rem;color:var(--txt3);margin-top:3px">Popup stops appearing after this time</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- APPEAR DELAY -->
+          <div style="background:var(--bg2);border:1px solid var(--bdr);padding:18px 20px;margin-bottom:14px">
+            <div style="font-weight:600;margin-bottom:4px">&#x23F1; Appearance Delay</div>
+            <div style="font-size:.75rem;color:var(--txt3);margin-bottom:12px">How long after page load before popup appears</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap" id="popup-delay-btns">
+              <button class="maint-type-btn active" onclick="setPopupDelay(this,3)">3s</button>
+              <button class="maint-type-btn" onclick="setPopupDelay(this,5)">5s</button>
+              <button class="maint-type-btn" onclick="setPopupDelay(this,8)">8s</button>
+              <button class="maint-type-btn" onclick="setPopupDelay(this,10)">10s</button>
+              <button class="maint-type-btn" onclick="setPopupDelay(this,15)">15s</button>
+              <button class="maint-type-btn" onclick="setPopupDelay(this,30)">30s</button>
+            </div>
+            <input type="hidden" id="popup-delay-val" value="3">
+          </div>
+
+          <!-- AUTO CLOSE -->
+          <div style="background:var(--bg2);border:1px solid var(--bdr);padding:18px 20px;margin-bottom:14px">
+            <div style="font-weight:600;margin-bottom:4px">&#x1F504; Auto-Close Timer</div>
+            <div style="font-size:.75rem;color:var(--txt3);margin-bottom:12px">Popup automatically closes after selected time. A countdown bar is shown to visitors.</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap" id="popup-autoclose-btns">
+              <button class="maint-type-btn active" onclick="setPopupAutoClose(this,0)">Never</button>
+              <button class="maint-type-btn" onclick="setPopupAutoClose(this,5)">5s</button>
+              <button class="maint-type-btn" onclick="setPopupAutoClose(this,10)">10s</button>
+              <button class="maint-type-btn" onclick="setPopupAutoClose(this,15)">15s</button>
+              <button class="maint-type-btn" onclick="setPopupAutoClose(this,30)">30s</button>
+              <button class="maint-type-btn" onclick="setPopupAutoClose(this,60)">60s</button>
+            </div>
+            <input type="hidden" id="popup-autoclose-val" value="0">
+            <div id="popup-autoclose-info" style="display:none;margin-top:10px;padding:8px 12px;background:rgba(62,240,184,.07);border:1px solid rgba(62,240,184,.2);font-size:.75rem;color:var(--mint)">
+              &#x26A1; A countdown progress bar will appear at the bottom of the popup
+            </div>
+          </div>
+
+          <!-- MEDIA -->
+          <div style="background:var(--bg2);border:1px solid var(--bdr);padding:18px 20px;margin-bottom:14px">
+            <div style="font-weight:600;margin-bottom:12px">&#x1F5BC; Media</div>
+            <div style="display:flex;gap:8px;margin-bottom:10px" id="popup-media-type-btns">
+              <button class="maint-type-btn active" onclick="setPopupMediaType(this,'none')">None</button>
+              <button class="maint-type-btn" onclick="setPopupMediaType(this,'image')">&#x1F5BC; Image</button>
+              <button class="maint-type-btn" onclick="setPopupMediaType(this,'video')">&#x1F3AC; Video</button>
+            </div>
+            <div id="popup-media-url-row" style="display:none">
+              <label class="fl">Media URL</label>
+              <input class="fi" id="popup-media-url" type="url" placeholder="https://...">
+              <div style="font-size:.72rem;color:var(--txt3);margin-top:4px">Image: .jpg / .png / .webp &nbsp;|&nbsp; Video: YouTube URL or direct .mp4</div>
+            </div>
+          </div>
+
+          <!-- CONTENT -->
+          <div style="background:var(--bg2);border:1px solid var(--bdr);padding:18px 20px;margin-bottom:14px">
+            <div style="font-weight:600;margin-bottom:12px">&#x270F; Content</div>
+            <div class="fg" style="margin-bottom:12px">
+              <label class="fl">Title</label>
+              <input class="fi" id="popup-title" type="text" placeholder="e.g. &#x1F389; Special Announcement!">
+            </div>
+            <div class="fg">
+              <label class="fl">Message</label>
+              <textarea class="fta" id="popup-body" rows="3" placeholder="Your message to visitors..."></textarea>
+            </div>
+          </div>
+
+          <!-- CTA BUTTON -->
+          <div style="background:var(--bg2);border:1px solid var(--bdr);padding:18px 20px;margin-bottom:22px">
+            <div style="font-weight:600;margin-bottom:12px">&#x1F517; CTA Button <span style="color:var(--txt3);font-weight:400;font-size:.82rem">(optional)</span></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="fg">
+                <label class="fl">Button Label</label>
+                <input class="fi" id="popup-btn-label" type="text" placeholder="e.g. Learn More, Watch Now">
+              </div>
+              <div class="fg">
+                <label class="fl">Button URL</label>
+                <input class="fi" id="popup-btn-url" type="url" placeholder="https://...">
+              </div>
+            </div>
+          </div>
+
+          <!-- SAVE & PREVIEW & DELETE -->
+          <button class="btn btn-primary" onclick="savePopupSettings()" id="popup-save-btn" style="width:100%;padding:14px">
+            &#x1F4BE; Save Popup Settings
+          </button>
+          <div style="margin-top:12px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+            <button class="btn btn-ghost" onclick="previewPopup()" style="font-size:.82rem">
+              &#x1F441; Preview
+            </button>
+            <button class="btn btn-ghost" onclick="resetPopupForm()" style="font-size:.82rem;color:var(--gold);border-color:rgba(245,200,66,.35)">
+              &#x21BA; Reset Fields
+            </button>
+            <button class="btn btn-ghost" onclick="deletePopupSettings()" id="popup-delete-btn" style="font-size:.82rem;color:var(--red);border-color:rgba(248,113,113,.35)">
+              &#x1F5D1; Delete Popup
+            </button>
+          </div>
+
+        </div>
+      </div>
         <div style="background:rgba(62,240,184,.07);border:1px solid rgba(62,240,184,.2);padding:13px 18px;margin-bottom:22px;display:flex;align-items:center;gap:12px;font-size:.83rem;color:var(--txt2)">
           <span style="font-size:1.3rem">🔗</span>
           <div>Update any social media link here — changes apply to the <strong style="color:var(--txt)">live website instantly</strong>. Leave blank to hide that platform.</div>
@@ -2004,110 +2479,9 @@ tr:hover td{background:rgba(82,130,255,.03)}
           </div>
 
         </div>
-      
-
       </div>
 
-
-      <!-- POPUP MESSAGE PAGE -->
-      <div class="page" id="page-popup">
-        <div class="ph">
-          <div class="ph-title">Popup <em>Message</em></div>
-        </div>
-
-        <div style="max-width:720px">
-          <!-- INFO BOX -->
-          <div style="background:rgba(82,130,255,.07);border:1px solid rgba(82,130,255,.2);padding:14px 18px;margin-bottom:22px;font-size:.84rem;color:var(--txt2);display:flex;align-items:center;gap:12px">
-            <span style="font-size:1.4rem">💬</span>
-            <div>This popup will appear on the website <strong style="color:var(--txt)">5 seconds</strong> after page load. You can add an image or video, title, message, and a call-to-action button.</div>
-          </div>
-
-          <!-- ENABLE TOGGLE -->
-          <div style="background:var(--bg2);border:1px solid var(--bdr);padding:18px 20px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">
-            <div>
-              <div style="font-weight:700;font-size:.95rem;margin-bottom:3px">Enable Popup</div>
-              <div style="font-size:.78rem;color:var(--txt3)">Show this popup to visitors</div>
-            </div>
-            <label style="position:relative;display:inline-block;width:52px;height:28px;cursor:pointer">
-              <input type="checkbox" id="popup-enabled" style="opacity:0;width:0;height:0" onchange="updatePopupToggle(this.checked)">
-              <span id="popup-track" style="position:absolute;inset:0;background:var(--bg4);border:1px solid var(--bdr);transition:.3s">
-                <span id="popup-thumb" style="position:absolute;top:4px;left:4px;width:18px;height:18px;background:var(--txt3);transition:.3s"></span>
-              </span>
-            </label>
-          </div>
-
-          <!-- DELAY -->
-          <div style="background:var(--bg2);border:1px solid var(--bdr);padding:18px 20px;margin-bottom:14px">
-            <div style="font-weight:600;margin-bottom:12px">Delay (seconds)</div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap" id="popup-delay-btns">
-              <button class="maint-type-btn active" onclick="setPopupDelay(this,3)">3s</button>
-              <button class="maint-type-btn" onclick="setPopupDelay(this,5)">5s</button>
-              <button class="maint-type-btn" onclick="setPopupDelay(this,8)">8s</button>
-              <button class="maint-type-btn" onclick="setPopupDelay(this,10)">10s</button>
-              <button class="maint-type-btn" onclick="setPopupDelay(this,15)">15s</button>
-              <button class="maint-type-btn" onclick="setPopupDelay(this,30)">30s</button>
-            </div>
-            <input type="hidden" id="popup-delay-val" value="5">
-          </div>
-
-          <!-- MEDIA -->
-          <div style="background:var(--bg2);border:1px solid var(--bdr);padding:18px 20px;margin-bottom:14px">
-            <div style="font-weight:600;margin-bottom:12px">Media (Image or Video)</div>
-            <div style="display:flex;gap:8px;margin-bottom:10px" id="popup-media-type-btns">
-              <button class="maint-type-btn active" onclick="setPopupMediaType(this,'none')">None</button>
-              <button class="maint-type-btn" onclick="setPopupMediaType(this,'image')">🖼 Image</button>
-              <button class="maint-type-btn" onclick="setPopupMediaType(this,'video')">🎬 Video</button>
-            </div>
-            <div id="popup-media-url-row" style="display:none">
-              <label class="fl">Media URL</label>
-              <input class="fi" id="popup-media-url" type="url" placeholder="https://... (image or YouTube/video URL)">
-              <div style="font-size:.72rem;color:var(--txt3);margin-top:4px">Image: direct .jpg/.png/.webp URL &nbsp;|&nbsp; Video: YouTube URL or direct .mp4 URL</div>
-            </div>
-          </div>
-
-          <!-- CONTENT -->
-          <div style="background:var(--bg2);border:1px solid var(--bdr);padding:18px 20px;margin-bottom:14px">
-            <div style="font-weight:600;margin-bottom:12px">Content</div>
-            <div class="fg" style="margin-bottom:12px">
-              <label class="fl">Title</label>
-              <input class="fi" id="popup-title" type="text" placeholder="e.g. 🎉 Special Announcement!">
-            </div>
-            <div class="fg" style="margin-bottom:12px">
-              <label class="fl">Message</label>
-              <textarea class="fta" id="popup-body" rows="3" placeholder="Your message to visitors..."></textarea>
-            </div>
-          </div>
-
-          <!-- CTA BUTTON -->
-          <div style="background:var(--bg2);border:1px solid var(--bdr);padding:18px 20px;margin-bottom:22px">
-            <div style="font-weight:600;margin-bottom:12px">Call-to-Action Button <span style="color:var(--txt3);font-weight:400;font-size:.82rem">(optional)</span></div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-              <div class="fg">
-                <label class="fl">Button Label</label>
-                <input class="fi" id="popup-btn-label" type="text" placeholder="e.g. Watch Now, Learn More...">
-              </div>
-              <div class="fg">
-                <label class="fl">Button URL</label>
-                <input class="fi" id="popup-btn-url" type="url" placeholder="https://...">
-              </div>
-            </div>
-          </div>
-
-          <!-- SAVE -->
-          <button class="btn btn-primary" onclick="savePopupSettings()" id="popup-save-btn" style="width:100%;padding:14px">
-            💾 Save Popup Settings
-          </button>
-
-          <!-- PREVIEW -->
-          <div style="margin-top:14px;text-align:center">
-            <button class="btn btn-ghost" onclick="previewPopup()" style="font-size:.82rem">
-              👁 Preview Popup
-            </button>
-          </div>
-        </div>
-      </div>
-
-   <!-- SETTINGS -->
+      <!-- SETTINGS -->
       <div class="page" id="page-settings">
         <div class="ph"><div class="ph-title">Admin <em>Settings</em></div></div>
         <div class="sg">
@@ -2792,12 +3166,6 @@ function subscribeNotices() {
       noticesCache = snap.docs.map(d => ({ id:d.id, ...d.data() }));
       renderNoticesAdminPage();
       updateNoticesBadge();
-    },
-    err => {
-      console.error('subscribeNotices error:', err.message);
-      if (err.code === 'permission-denied') {
-        toast('⚠️ Firestore rules need /notices/ collection! Check rules.txt', 'error');
-      }
     }
   );
   // Also watch visibility setting
@@ -2886,6 +3254,40 @@ window.toggleNoticesVisibility = async function() {
 };
 
 // ── MODAL ─────────────────────────
+window.openNoticeModal = function(id) {
+  noticeEditId = id;
+  document.getElementById('notice-modal-title').textContent = id ? 'Edit Notice' : 'Add Notice';
+
+  // Clear
+  ['nm-title','nm-body','nm-link-url','nm-link-label','nm-expires'].forEach(i => {
+    const el = document.getElementById(i); if (el) el.value = '';
+  });
+  document.getElementById('nm-dismissible').checked = true;
+  document.querySelectorAll('#notice-type-btns .maint-type-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('#notice-type-btns [data-ntype="new"]')?.classList.add('active');
+  document.getElementById('nm-expires-preview').textContent = '';
+  document.querySelectorAll('#timer-presets .maint-type-btn').forEach(b => b.classList.remove('active'));
+
+  if (id) {
+    const n = noticesCache.find(x => x.id === id);
+    if (!n) return;
+    const s = (eid, val) => { const el = document.getElementById(eid); if(el&&val!==undefined) el.value=val; };
+    s('nm-title',       n.title     || '');
+    s('nm-body',        n.body      || '');
+    s('nm-link-url',    n.linkUrl   || '');
+    s('nm-link-label',  n.linkLabel || '');
+    if (n.expiresAt) {
+      const d = n.expiresAt.toDate ? n.expiresAt.toDate() : new Date(n.expiresAt);
+      document.getElementById('nm-expires').value = d.toISOString().slice(0,16);
+    }
+    document.getElementById('nm-dismissible').checked = n.dismissible !== false;
+    const typeBtn = document.querySelector(`#notice-type-btns [data-ntype="${n.type}"]`);
+    if (typeBtn) { document.querySelectorAll('#notice-type-btns .maint-type-btn').forEach(b=>b.classList.remove('active')); typeBtn.classList.add('active'); }
+    updateNmExpiresPreview();
+  }
+
+  openM('noticeModal');
+};
 
 window.selectNoticeType = function(btn, type) {
   document.querySelectorAll('#notice-type-btns .maint-type-btn').forEach(b => b.classList.remove('active'));
@@ -2955,8 +3357,8 @@ window.saveNotice = async function() {
       await addDoc(collection(_db,'notices'), data);
       toast('Notice published ✓','success');
     }
-    closeNoticeModal();
-  } catch(e) { toast('Error saving: '+e.message,'error'); console.error('saveNotice error:',e); }
+    closeM('noticeModal');
+  } catch(e) { toast('Error: '+e.message,'error'); }
   finally {
     const btn = document.getElementById('notice-save-btn');
     if (btn) { btn.textContent='Save Notice'; btn.disabled=false; }
@@ -3543,213 +3945,6 @@ window.sendAiViaGmail = function() {
 };
 
 // Update settings page on open
-
-/* ══════════════════════
-   NOTICE MODAL
-══════════════════════ */
-window.openNoticeModal = function(id) {
-  noticeEditId = id;
-  document.getElementById('notice-modal-title').textContent = id ? 'Edit Notice' : 'Add Notice';
-  ['nm-title','nm-body','nm-link-url','nm-link-label','nm-expires'].forEach(function(i) {
-    var el = document.getElementById(i); if (el) el.value = '';
-  });
-  var disc = document.getElementById('nm-dismissible');
-  if (disc) disc.checked = true;
-  document.querySelectorAll('#notice-type-btns .maint-type-btn').forEach(function(b){ b.classList.remove('active'); });
-  var defBtn = document.querySelector('#notice-type-btns [data-ntype="new"]');
-  if (defBtn) defBtn.classList.add('active');
-  var ep = document.getElementById('nm-expires-preview');
-  if (ep) ep.textContent = '';
-  document.querySelectorAll('#timer-presets .maint-type-btn').forEach(function(b){ b.classList.remove('active'); });
-
-  if (id) {
-    var n = noticesCache.find(function(x){ return x.id === id; });
-    if (n) {
-      var s = function(eid, val) { var el=document.getElementById(eid); if(el&&val!==undefined) el.value=val; };
-      s('nm-title', n.title || '');
-      s('nm-body', n.body || '');
-      s('nm-link-url', n.linkUrl || '');
-      s('nm-link-label', n.linkLabel || '');
-      if (n.expiresAt) {
-        var d = n.expiresAt.toDate ? n.expiresAt.toDate() : new Date(n.expiresAt);
-        var exEl = document.getElementById('nm-expires');
-        if (exEl) exEl.value = d.toISOString().slice(0,16);
-      }
-      if (disc) disc.checked = n.dismissible !== false;
-      var tb = document.querySelector('#notice-type-btns [data-ntype="'+n.type+'"]');
-      if (tb) {
-        document.querySelectorAll('#notice-type-btns .maint-type-btn').forEach(function(b){ b.classList.remove('active'); });
-        tb.classList.add('active');
-      }
-      if (typeof updateNmExpiresPreview === 'function') updateNmExpiresPreview();
-    }
-  }
-  var m = document.getElementById('noticeModal');
-  if (m) { m.style.display = 'flex'; document.body.style.overflow = 'hidden'; }
-};
-
-window.closeNoticeModal = function() {
-  var m = document.getElementById('noticeModal');
-  if (m) { m.style.display = 'none'; document.body.style.overflow = ''; }
-};
-
-
-/* ══════════════════════════════════════
-   POPUP MESSAGE SYSTEM
-══════════════════════════════════════ */
-let popupDelayVal = 5;
-let popupMediaType = 'none';
-
-function subscribePopup() {
-  const _db = window.__db;
-  if (!_db) { setTimeout(subscribePopup, 600); return; }
-  const { doc, onSnapshot } = window.__fbModules;
-  onSnapshot(doc(_db, 'settings', 'popup'), snap => {
-    if (snap.exists()) {
-      const d = snap.data();
-      renderPopupPage(d);
-    }
-  }, () => {});
-}
-
-function renderPopupPage(data) {
-  data = data || {};
-  const en = document.getElementById('popup-enabled');
-  if (en) {
-    en.checked = data.enabled === true;
-    updatePopupToggle(data.enabled === true);
-  }
-  const delayVal = data.delay || 5;
-  popupDelayVal = delayVal;
-  document.querySelectorAll('#popup-delay-btns .maint-type-btn').forEach(b => {
-    b.classList.remove('active');
-    if (parseInt(b.textContent) === delayVal) b.classList.add('active');
-  });
-  const dv = document.getElementById('popup-delay-val');
-  if (dv) dv.value = delayVal;
-
-  const mt = data.mediaType || 'none';
-  popupMediaType = mt;
-  document.querySelectorAll('#popup-media-type-btns .maint-type-btn').forEach(b => {
-    b.classList.remove('active');
-    if (b.getAttribute('onclick') && b.getAttribute('onclick').includes("'" + mt + "'")) b.classList.add('active');
-  });
-  const urlRow = document.getElementById('popup-media-url-row');
-  if (urlRow) urlRow.style.display = mt !== 'none' ? 'block' : 'none';
-  const mu = document.getElementById('popup-media-url');
-  if (mu) mu.value = data.mediaUrl || '';
-
-  const fi = (id, val) => { const el=document.getElementById(id); if(el) el.value=val||''; };
-  fi('popup-title', data.title);
-  fi('popup-body', data.body);
-  fi('popup-btn-label', data.btnLabel);
-  fi('popup-btn-url', data.btnUrl);
-}
-
-window.updatePopupToggle = function(checked) {
-  const track = document.getElementById('popup-track');
-  const thumb = document.getElementById('popup-thumb');
-  if (!track || !thumb) return;
-  track.style.background  = checked ? 'rgba(62,240,184,0.2)' : 'var(--bg4)';
-  track.style.borderColor = checked ? 'rgba(62,240,184,0.4)' : 'var(--bdr)';
-  thumb.style.background  = checked ? 'var(--mint)' : 'var(--txt3)';
-  thumb.style.transform   = checked ? 'translateX(24px)' : 'translateX(0)';
-};
-
-window.setPopupDelay = function(btn, val) {
-  document.querySelectorAll('#popup-delay-btns .maint-type-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  popupDelayVal = val;
-  const dv = document.getElementById('popup-delay-val');
-  if (dv) dv.value = val;
-};
-
-window.setPopupMediaType = function(btn, type) {
-  document.querySelectorAll('#popup-media-type-btns .maint-type-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  popupMediaType = type;
-  const row = document.getElementById('popup-media-url-row');
-  if (row) row.style.display = type !== 'none' ? 'block' : 'none';
-};
-
-window.savePopupSettings = async function() {
-  const _db = window.__db;
-  if (!_db) { toast('DB not ready', 'error'); return; }
-  const { doc, setDoc, serverTimestamp } = window.__fbModules;
-  const enabled   = document.getElementById('popup-enabled')?.checked || false;
-  const delay     = parseInt(document.getElementById('popup-delay-val')?.value) || 5;
-  const mediaUrl  = document.getElementById('popup-media-url')?.value?.trim() || '';
-  const title     = document.getElementById('popup-title')?.value?.trim() || '';
-  const body      = document.getElementById('popup-body')?.value?.trim() || '';
-  const btnLabel  = document.getElementById('popup-btn-label')?.value?.trim() || '';
-  const btnUrl    = document.getElementById('popup-btn-url')?.value?.trim() || '';
-  const btn = document.getElementById('popup-save-btn');
-  try {
-    if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
-    await setDoc(doc(_db, 'settings', 'popup'), {
-      enabled, delay, mediaType: popupMediaType, mediaUrl,
-      title, body, btnLabel, btnUrl, updatedAt: serverTimestamp()
-    });
-    toast('Popup settings saved ✓', 'success');
-  } catch(e) {
-    toast('Error: ' + e.message, 'error');
-  } finally {
-    if (btn) { btn.textContent = '💾 Save Popup Settings'; btn.disabled = false; }
-  }
-};
-
-window.previewPopup = function() {
-  const title    = document.getElementById('popup-title')?.value?.trim() || 'Preview Title';
-  const body     = document.getElementById('popup-body')?.value?.trim() || 'Preview message.';
-  const mediaUrl = document.getElementById('popup-media-url')?.value?.trim() || '';
-  const btnLabel = document.getElementById('popup-btn-label')?.value?.trim() || '';
-  const btnUrl   = document.getElementById('popup-btn-url')?.value?.trim() || '';
-  showFdPopup({ enabled:true, delay:0, mediaType: popupMediaType, mediaUrl, title, body, btnLabel, btnUrl }, true);
-};
-
-// Generic popup renderer (used for preview AND called from index.html via __fbModules pattern)
-window.showFdPopup = function(data, isPreview) {
-  const existing = document.getElementById('fd-popup-overlay');
-  if (existing) existing.remove();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'fd-popup-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:9500;background:rgba(2,5,16,.88);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px);animation:fadeIn .3s ease';
-  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
-
-  let mediaHtml = '';
-  if (data.mediaType === 'image' && data.mediaUrl) {
-    mediaHtml = `<img src="${data.mediaUrl}" style="width:100%;max-height:240px;object-fit:cover;display:block" onerror="this.style.display='none'">`;
-  } else if (data.mediaType === 'video' && data.mediaUrl) {
-    const url = data.mediaUrl;
-    if (url.includes('youtube') || url.includes('youtu.be')) {
-      const vid = url.match(/(?:v=|youtu\.be\/)([^&?/]+)/)?.[1] || '';
-      mediaHtml = `<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden"><iframe src="https://www.youtube.com/embed/${vid}?autoplay=0" style="position:absolute;inset:0;width:100%;height:100%;border:none" allowfullscreen></iframe></div>`;
-    } else {
-      mediaHtml = `<video src="${url}" style="width:100%;max-height:240px;object-fit:cover" controls></video>`;
-    }
-  }
-
-  const btnHtml = data.btnLabel
-    ? `<a href="${data.btnUrl||'#'}" target="_blank" rel="noopener" style="display:inline-block;padding:11px 28px;background:linear-gradient(135deg,#5282ff,#38d9f5);color:#020510;font-weight:700;font-size:.88rem;text-decoration:none;margin-top:4px">${data.btnLabel} →</a>`
-    : '';
-
-  overlay.innerHTML = `
-    <div style="background:var(--bg2,#0d1626);border:1px solid rgba(82,130,255,.35);max-width:500px;width:100%;max-height:90vh;overflow-y:auto;position:relative;animation:up .35s ease">
-      <button onclick="document.getElementById('fd-popup-overlay').remove();document.body.style.overflow=''" style="position:absolute;top:12px;right:12px;z-index:2;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;width:32px;height:32px;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center">&times;</button>
-      ${mediaHtml ? `<div style="overflow:hidden">${mediaHtml}</div>` : ''}
-      <div style="padding:24px 24px 28px">
-        ${isPreview ? '<div style="font-size:.65rem;font-family:JetBrains Mono,monospace;color:#f5c842;background:rgba(245,200,66,.1);border:1px solid rgba(245,200,66,.3);padding:3px 10px;display:inline-block;margin-bottom:10px;letter-spacing:.1em">PREVIEW MODE</div>' : ''}
-        ${data.title ? `<div style="font-family:Bricolage Grotesque,sans-serif;font-weight:800;font-size:1.35rem;color:#fff;margin-bottom:10px;line-height:1.2">${data.title}</div>` : ''}
-        ${data.body ? `<div style="font-size:.88rem;color:rgba(255,255,255,.7);line-height:1.65;margin-bottom:16px">${data.body}</div>` : ''}
-        ${btnHtml}
-      </div>
-    </div>`;
-
-  document.body.appendChild(overlay);
-  document.body.style.overflow = 'hidden';
-};
-
 document.addEventListener('DOMContentLoaded', () => {
   const emailEl = document.getElementById('qs-email');
   const roleEl  = document.getElementById('qs-role');
@@ -3813,81 +4008,5 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
   </div>
 
-
-<!-- ═══════════════════════════════════
-     NOTICE MODAL - TOP LEVEL
-═══════════════════════════════════ -->
-<div id="noticeModal" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(2,5,16,.92);align-items:center;justify-content:center;overflow-y:auto;padding:20px" onclick="if(event.target===this)closeNoticeModal()">
-  <div style="background:var(--bg2);border:1px solid var(--bdr2);max-width:580px;width:100%;position:relative;animation:up .3s ease">
-    <div class="mh">
-      <div class="mh-title" id="notice-modal-title">Add Notice</div>
-      <button class="mc-x" onclick="closeNoticeModal()">✕</button>
-    </div>
-    <div class="mb" style="display:flex;flex-direction:column;gap:14px">
-
-      <div class="fg">
-        <label class="fl">Notice Type</label>
-        <div style="display:flex;gap:7px;flex-wrap:wrap" id="notice-type-btns">
-          <button class="maint-type-btn active" data-ntype="new"    onclick="selectNoticeType(this,'new')">✨ New</button>
-          <button class="maint-type-btn" data-ntype="update"  onclick="selectNoticeType(this,'update')">🔄 Update</button>
-          <button class="maint-type-btn" data-ntype="event"   onclick="selectNoticeType(this,'event')">📅 Event</button>
-          <button class="maint-type-btn" data-ntype="video"   onclick="selectNoticeType(this,'video')">🎬 Video</button>
-          <button class="maint-type-btn" data-ntype="info"    onclick="selectNoticeType(this,'info')">💡 Info</button>
-        </div>
-      </div>
-
-      <div class="fg"><label class="fl">Title <span style="color:var(--red)">*</span></label>
-        <input class="fi" id="nm-title" type="text" placeholder="e.g. New Video Released!">
-      </div>
-
-      <div class="fg"><label class="fl">Message Body</label>
-        <textarea class="fta" id="nm-body" rows="3" placeholder="Details about this announcement..."></textarea>
-      </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="fg"><label class="fl">Link URL <span style="color:var(--txt3);font-weight:400">(optional)</span></label>
-          <input class="fi" id="nm-link-url" type="url" placeholder="https://...">
-        </div>
-        <div class="fg"><label class="fl">Link Label</label>
-          <input class="fi" id="nm-link-label" type="text" placeholder="Watch Now, Learn More...">
-        </div>
-      </div>
-
-      <div class="fg">
-        <label class="fl">Auto-Expire <span style="color:var(--txt3);font-weight:400">(optional)</span></label>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:8px" id="timer-presets">
-          <button class="maint-type-btn" onclick="setTimerPreset(1)">1 Hour</button>
-          <button class="maint-type-btn" onclick="setTimerPreset(6)">6 Hours</button>
-          <button class="maint-type-btn" onclick="setTimerPreset(24)">1 Day</button>
-          <button class="maint-type-btn" onclick="setTimerPreset(72)">3 Days</button>
-          <button class="maint-type-btn" onclick="setTimerPreset(168)">1 Week</button>
-          <button class="maint-type-btn" onclick="setTimerPreset(336)">2 Weeks</button>
-          <button class="maint-type-btn" onclick="setTimerPreset(720)">1 Month</button>
-          <button class="maint-type-btn" onclick="setTimerPreset(0)">No Expiry</button>
-        </div>
-        <input class="fi" id="nm-expires" type="datetime-local">
-        <div style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--txt3);margin-top:4px" id="nm-expires-preview"></div>
-      </div>
-
-      <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg3);border:1px solid var(--bdr);padding:12px 14px">
-        <div>
-          <div class="fl" style="margin-bottom:2px">Allow Dismiss</div>
-          <div style="font-size:.73rem;color:var(--txt3)">Visitors can close this notice</div>
-        </div>
-        <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer">
-          <input type="checkbox" id="nm-dismissible" checked style="opacity:0;width:0;height:0">
-          <span id="nm-dis-track" style="position:absolute;inset:0;background:rgba(62,240,184,.2);border:1px solid rgba(62,240,184,.4);transition:.3s">
-            <span id="nm-dis-thumb" style="position:absolute;top:3px;left:3px;width:16px;height:16px;background:var(--mint);transform:translateX(20px);transition:.3s"></span>
-          </span>
-        </label>
-      </div>
-
-    </div>
-    <div class="mf">
-      <button class="btn btn-ghost" onclick="closeNoticeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveNotice()" id="notice-save-btn">Save Notice</button>
-    </div>
-  </div>
-</div>
 </body>
 </html>
