@@ -687,28 +687,148 @@ function renderAdmins() {
   if (!el) return;
 
   const allAdmins = [...pending, ...approved, ...rejected];
-  el.innerHTML = !allAdmins.length ? '<div class="empty"><div class="empty-ico">👥</div><div class="empty-txt">No admin requests yet</div></div>' :
-    allAdmins.map(a => `
-      <div class="adm-card ${a.status}">
+  el.innerHTML = !allAdmins.length
+    ? '<div class="empty"><div class="empty-ico">👥</div><div class="empty-txt">No admins yet — click "Add Admin" to add one</div></div>'
+    : allAdmins.map(a => {
+      const extraInfo = [
+        a.age       ? '🎂 Age: ' + a.age : '',
+        a.dob       ? '📅 DOB: ' + a.dob : '',
+        a.companyId ? '🏢 ID: ' + esc(a.companyId) : '',
+        a.role      ? '🔑 ' + (a.role === 'main_admin' ? 'Main Admin' : 'Admin') : '',
+      ].filter(Boolean).join('  ·  ');
+      return `
+      <div class="adm-card ${a.status}" style="margin-bottom:12px">
         <div class="adm-top">
-          <div>
+          <div style="flex:1">
             <div class="adm-name">${esc(a.displayName || a.email)}</div>
             <div class="adm-email">${esc(a.email)}</div>
+            ${a.description ? `<div style="font-size:.75rem;color:var(--txt2);margin-top:4px;font-style:italic">${esc(a.description)}</div>` : ''}
+            ${extraInfo ? `<div style="font-size:.7rem;color:var(--txt3);margin-top:6px">${extraInfo}</div>` : ''}
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
-            ${a.status === 'pending'  ? '<span class="badge b-gold">⏳ Pending Approval</span>' : ''}
-            ${a.status === 'approved' ? '<span class="badge b-mint">✓ Approved</span>'          : ''}
-            ${a.status === 'rejected' ? '<span class="badge b-red">✕ Rejected</span>'           : ''}
+            ${a.status === 'pending'  ? '<span class="badge b-gold">⏳ Pending</span>' : ''}
+            ${a.status === 'approved' ? '<span class="badge b-mint">✓ Approved</span>' : ''}
+            ${a.status === 'rejected' ? '<span class="badge b-red">✕ Rejected</span>' : ''}
             <span style="font-family:JetBrains Mono,monospace;font-size:.58rem;color:var(--txt3)">${fmtTS(a.requestedAt)}</span>
           </div>
         </div>
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="openEditAdminModal('${a.id}')">✏️ Edit</button>
           ${a.status !== 'approved' ? `<button class="btn btn-success btn-sm" onclick="approveAdmin('${a.id}','${esc(a.email)}')">✓ Approve</button>` : ''}
-          ${a.status !== 'rejected' ? `<button class="btn btn-danger btn-sm" onclick="rejectAdmin('${a.id}')">✕ Reject</button>`  : ''}
-          ${a.status === 'approved' ? `<button class="btn btn-danger btn-sm" onclick="revokeAdmin('${a.id}')">⊘ Revoke Access</button>` : ''}
+          ${a.status !== 'rejected' ? `<button class="btn btn-danger btn-sm" onclick="rejectAdmin('${a.id}')">✕ Reject</button>` : ''}
+          ${a.status === 'approved' ? `<button class="btn btn-danger btn-sm" onclick="revokeAdmin('${a.id}')">⊘ Revoke</button>` : ''}
+          <button class="btn btn-danger btn-sm" onclick="deleteAdmin('${a.id}')" style="margin-left:auto">🗑 Delete</button>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
 }
+
+/* === ADD / EDIT ADMIN MODAL === */
+window.openAddAdminModal = function() {
+  document.getElementById('adm-edit-id').value = '';
+  document.getElementById('adm-modal-title').textContent = 'Add New Admin';
+  document.getElementById('adm-modal-note').style.display = 'block';
+  ['adm-f-name','adm-f-email','adm-f-age','adm-f-dob','adm-f-companyid','adm-f-desc'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('adm-f-role').value   = 'admin';
+  document.getElementById('adm-f-status').value = 'approved';
+  document.getElementById('adm-f-email').readOnly = false;
+  var m = document.getElementById('adminModal');
+  if (m) { m.style.display = 'flex'; }
+};
+
+window.openEditAdminModal = function(id) {
+  var a = adminsCache.find(function(x){ return x.id === id; });
+  if (!a) return;
+  document.getElementById('adm-edit-id').value        = id;
+  document.getElementById('adm-modal-title').textContent = 'Edit Admin';
+  document.getElementById('adm-modal-note').style.display = 'none';
+  document.getElementById('adm-f-name').value         = a.displayName  || '';
+  document.getElementById('adm-f-email').value        = a.email        || '';
+  document.getElementById('adm-f-email').readOnly     = true;
+  document.getElementById('adm-f-age').value          = a.age          || '';
+  document.getElementById('adm-f-dob').value          = a.dob          || '';
+  document.getElementById('adm-f-companyid').value    = a.companyId    || '';
+  document.getElementById('adm-f-desc').value         = a.description  || '';
+  document.getElementById('adm-f-role').value         = a.role         || 'admin';
+  document.getElementById('adm-f-status').value       = a.status       || 'approved';
+  var m = document.getElementById('adminModal');
+  if (m) { m.style.display = 'flex'; }
+};
+
+window.closeAdminModal = function() {
+  var m = document.getElementById('adminModal');
+  if (m) m.style.display = 'none';
+};
+
+window.saveAdminDetails = async function() {
+  var editId  = document.getElementById('adm-edit-id').value.trim();
+  var name    = document.getElementById('adm-f-name').value.trim();
+  var email   = document.getElementById('adm-f-email').value.trim();
+  var age     = document.getElementById('adm-f-age').value.trim();
+  var dob     = document.getElementById('adm-f-dob').value.trim();
+  var compId  = document.getElementById('adm-f-companyid').value.trim();
+  var desc    = document.getElementById('adm-f-desc').value.trim();
+  var role    = document.getElementById('adm-f-role').value;
+  var status  = document.getElementById('adm-f-status').value;
+
+  if (!name) { toast('Name is required', 'error'); return; }
+  if (!editId && !email) { toast('Email is required', 'error'); return; }
+
+  var _db = window.__db;
+  if (!_db) { toast('DB not ready', 'error'); return; }
+
+  var btn = document.getElementById('adm-save-btn');
+  try {
+    if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
+
+    var data = {
+      displayName: name,
+      age:         age     ? parseInt(age) : null,
+      dob:         dob     || null,
+      companyId:   compId  || null,
+      description: desc    || null,
+      role:        role,
+      status:      status,
+      updatedAt:   window.__fbModules.serverTimestamp()
+    };
+
+    if (editId) {
+      // Edit existing
+      await window.__fbModules.updateDoc(window.__fbModules.doc(_db, 'admins', editId), data);
+      await logActivity('✏️', 'Admin profile updated', name);
+      toast('Admin updated!', 'success');
+    } else {
+      // Add new admin - use email as document ID (sanitized)
+      var docId = email.replace(/[^a-zA-Z0-9]/g, '_');
+      data.email        = email;
+      data.requestedAt  = window.__fbModules.serverTimestamp();
+      data.addedBy      = _currentAdminName || 'Main Admin';
+      await window.__fbModules.setDoc(window.__fbModules.doc(_db, 'admins', docId), data);
+      await logActivity('👤', 'Admin added', name + ' (' + email + ')');
+      toast('Admin added!', 'success');
+    }
+    closeAdminModal();
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.innerHTML = '&#x1F4BE; Save Admin'; btn.disabled = false; }
+  }
+};
+
+window.deleteAdmin = async function(id) {
+  var a = adminsCache.find(function(x){ return x.id === id; });
+  if (!confirm('Delete admin "' + (a ? (a.displayName || a.email) : id) + '" permanently?')) return;
+  var _db = window.__db;
+  try {
+    await window.__fbModules.deleteDoc(window.__fbModules.doc(_db, 'admins', id));
+    await logActivity('🗑️', 'Admin deleted', a ? (a.displayName || a.email) : id);
+    toast('Admin deleted', 'success');
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+  }
+};
 
 window.approveAdmin = async function(id, email) {
   await updateDoc(doc(db, 'admins', id), { status: 'approved', approvedAt: serverTimestamp() });
@@ -1976,15 +2096,89 @@ tr:hover td{background:rgba(82,130,255,.03)}
       <div class="page" id="page-admins">
         <div class="ph">
           <div class="ph-title">Admin <em>Management</em></div>
-          <div style="display:flex;gap:8px">
+          <div style="display:flex;gap:8px;align-items:center">
             <span class="badge b-gold" style="font-size:.65rem;padding:6px 12px">Pending: <span id="adm-pending-count">0</span></span>
             <span class="badge b-mint" style="font-size:.65rem;padding:6px 12px">Approved: <span id="adm-approved-count">0</span></span>
+            <button class="btn btn-primary btn-sm" onclick="openAddAdminModal()" style="margin-left:8px">&#x2795; Add Admin</button>
           </div>
         </div>
-        <div style="background:rgba(245,200,66,.07);border:1px solid rgba(245,200,66,.25);padding:12px 16px;margin-bottom:16px;font-size:.82rem;color:var(--txt2)">
-          ★ As <strong style="color:var(--gold)">Main Admin</strong>, you control who can access this admin panel. Approve or reject admin requests. Approved admins can view all messages and projects. When you approve, Gmail will open to notify them automatically.
+
+        <div style="background:rgba(245,200,66,.07);border:1px solid rgba(245,200,66,.25);padding:12px 16px;margin-bottom:20px;font-size:.82rem;color:var(--txt2)">
+          &#x2605; As <strong style="color:var(--gold)">Main Admin</strong>, you control who can access this admin panel. Add admins directly, or approve/reject requests. Approved admins can view all messages and projects.
         </div>
+
         <div id="adm-list"></div>
+      </div>
+
+      <!-- ADD / EDIT ADMIN MODAL -->
+      <div class="modal-bg" id="adminModal" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(2,5,16,.88);display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)">
+        <div style="background:#0d1626;border:1px solid rgba(82,130,255,.35);max-width:560px;width:100%;max-height:90vh;overflow-y:auto">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--bdr)">
+            <div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.1rem" id="adm-modal-title">Add New Admin</div>
+            <button onclick="closeAdminModal()" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;width:30px;height:30px;cursor:pointer;font-size:1rem">&times;</button>
+          </div>
+          <div style="padding:22px">
+            <input type="hidden" id="adm-edit-id">
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+              <div class="fg">
+                <label class="fl">Full Name *</label>
+                <input class="fi" id="adm-f-name" type="text" placeholder="e.g. Oshan Sudharaka">
+              </div>
+              <div class="fg">
+                <label class="fl">Email Address *</label>
+                <input class="fi" id="adm-f-email" type="email" placeholder="admin@gmail.com">
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
+              <div class="fg">
+                <label class="fl">Age</label>
+                <input class="fi" id="adm-f-age" type="number" min="16" max="80" placeholder="e.g. 25">
+              </div>
+              <div class="fg">
+                <label class="fl">Date of Birth</label>
+                <input class="fi" id="adm-f-dob" type="date" style="color-scheme:dark">
+              </div>
+              <div class="fg">
+                <label class="fl">Company ID</label>
+                <input class="fi" id="adm-f-companyid" type="text" placeholder="e.g. FD-001">
+              </div>
+            </div>
+
+            <div class="fg" style="margin-bottom:12px">
+              <label class="fl">Description / Role Details</label>
+              <textarea class="fta" id="adm-f-desc" rows="2" placeholder="e.g. Lead designer, handles client projects..."></textarea>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+              <div class="fg">
+                <label class="fl">Role</label>
+                <select class="fi" id="adm-f-role" style="background:var(--bg3)">
+                  <option value="admin">Admin</option>
+                  <option value="main_admin">Main Admin</option>
+                </select>
+              </div>
+              <div class="fg">
+                <label class="fl">Status</label>
+                <select class="fi" id="adm-f-status" style="background:var(--bg3)">
+                  <option value="approved">Approved</option>
+                  <option value="pending">Pending</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="margin-top:8px;padding:10px 14px;background:rgba(82,130,255,.06);border:1px solid rgba(82,130,255,.15);font-size:.75rem;color:var(--txt3)" id="adm-modal-note">
+              &#x2139; The new admin must sign up with this email to access the panel. Their account will be pre-approved.
+            </div>
+
+            <div style="display:flex;gap:10px;margin-top:18px">
+              <button class="btn btn-primary" onclick="saveAdminDetails()" id="adm-save-btn" style="flex:1;padding:12px">&#x1F4BE; Save Admin</button>
+              <button class="btn btn-ghost" onclick="closeAdminModal()" style="padding:12px 20px">Cancel</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- WEBSITE OVERVIEW -->
@@ -2708,82 +2902,7 @@ tr:hover td{background:rgba(82,130,255,.03)}
           </div>
 
         </div>
-      </div>
-        <div style="background:rgba(62,240,184,.07);border:1px solid rgba(62,240,184,.2);padding:13px 18px;margin-bottom:22px;display:flex;align-items:center;gap:12px;font-size:.83rem;color:var(--txt2)">
-          <span style="font-size:1.3rem">🔗</span>
-          <div>Update any social media link here — changes apply to the <strong style="color:var(--txt)">live website instantly</strong>. Leave blank to hide that platform.</div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px" id="social-fields-grid">
-
-          <div class="sp">
-            <div class="sp-title" style="color:#ff2020">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="#ff2020"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg>
-              YouTube
-            </div>
-            <div class="fg"><label class="fl">Channel URL</label><input class="fi" id="sl-youtube" type="url" placeholder="https://www.youtube.com/channel/..."></div>
-          </div>
-
-          <div class="sp">
-            <div class="sp-title" style="color:#1877f2">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="#1877f2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-              Facebook
-            </div>
-            <div class="fg"><label class="fl">Page URL</label><input class="fi" id="sl-facebook" type="url" placeholder="https://www.facebook.com/featuredesignz"></div>
-          </div>
-
-          <div class="sp">
-            <div class="sp-title" style="color:#e1306c">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="#e1306c"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
-              Instagram
-            </div>
-            <div class="fg"><label class="fl">Profile URL</label><input class="fi" id="sl-instagram" type="url" placeholder="https://www.instagram.com/featuredesignz"></div>
-          </div>
-
-          <div class="sp">
-            <div class="sp-title" style="color:#25d366">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-              WhatsApp
-            </div>
-            <div class="fg"><label class="fl">Number (with country code)</label><input class="fi" id="sl-whatsapp" type="text" placeholder="94786675150 (no + or spaces)"></div>
-          </div>
-
-          <div class="sp">
-            <div class="sp-title" style="color:#fff">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.19 8.19 0 004.77 1.52V6.73a4.85 4.85 0 01-1-.04z"/></svg>
-              TikTok
-            </div>
-            <div class="fg"><label class="fl">Profile URL</label><input class="fi" id="sl-tiktok" type="url" placeholder="https://www.tiktok.com/@featuredesignz"></div>
-          </div>
-
-          <div class="sp">
-            <div class="sp-title" style="color:#fff">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.258 5.626 5.906-5.626zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-              X (Twitter)
-            </div>
-            <div class="fg"><label class="fl">Profile URL</label><input class="fi" id="sl-twitter" type="url" placeholder="https://x.com/featuredesignz"></div>
-          </div>
-
-          <div class="sp">
-            <div class="sp-title" style="color:#0a66c2">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="#0a66c2"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
-              LinkedIn
-            </div>
-            <div class="fg"><label class="fl">Profile URL</label><input class="fi" id="sl-linkedin" type="url" placeholder="https://www.linkedin.com/company/featuredesignz"></div>
-          </div>
-
-          <div class="sp">
-            <div class="sp-title">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--blue)"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
-              GitHub
-            </div>
-            <div class="fg"><label class="fl">Profile URL</label><input class="fi" id="sl-github" type="url" placeholder="https://github.com/featuredesignz"></div>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- SETTINGS -->
-      <div class="page" id="page-settings">
+      </div><div class="page" id="page-settings">
         <div class="ph"><div class="ph-title">Admin <em>Settings</em></div></div>
         <div class="sg">
           <div class="sp">
