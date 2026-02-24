@@ -22,7 +22,7 @@ import { getFirestore, collection, doc, getDoc, getDocs, addDoc, updateDoc,
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // Expose modules globally for service status functions in regular <script>
-window.__fbModules = { doc, setDoc, serverTimestamp, onSnapshot, collection, addDoc, updateDoc, deleteDoc, query, orderBy, where, Timestamp };
+window.__fbModules = { doc, setDoc, serverTimestamp, onSnapshot, collection, addDoc, updateDoc, deleteDoc, getDocs, query, orderBy, where, Timestamp };
 window.__db = null; // will be set after init
 
 /* ══════════════════════════════════════
@@ -227,6 +227,7 @@ function friendlyErr(code) {
 function initApp(user, role) {
   // Update UI for role
   document.getElementById('app-user-name').textContent = user.displayName || user.email.split('@')[0];
+  _currentAdminName = user.displayName || user.email.split('@')[0];
   document.getElementById('app-user-email').textContent = user.email;
   document.getElementById('app-role-badge').textContent = role === 'main_admin' ? '★ Main Admin' : 'Admin';
   document.getElementById('app-role-badge').className = 'role-badge ' + (role === 'main_admin' ? 'role-main' : 'role-admin');
@@ -250,6 +251,7 @@ function initApp(user, role) {
   subscribeMaintenanceMode();
   subscribeNotices();
   subscribePopup();
+  subscribeActivity();
   if (role === 'main_admin') subscribeAdmins();
 
   // Show dashboard
@@ -642,10 +644,12 @@ window.saveProject = async function() {
   try {
     if (pEditId) {
       await updateDoc(doc(db, 'projects', pEditId), data);
+    await logActivity('✏️', 'Project updated', '');
       toast('Project updated! ✓', 'success');
     } else {
       data.createdAt = serverTimestamp();
       await addDoc(collection(db, 'projects'), data);
+    await logActivity('📁', 'Project added', '');
       toast('Project added! ✓', 'success');
     }
     closeM('projModal');
@@ -654,6 +658,7 @@ window.saveProject = async function() {
 
 window.delProj = async function(id) {
   await deleteDoc(doc(db, 'projects', id));
+    await logActivity('🗑️', 'Project deleted', '');
   toast('Project deleted', 'success');
 };
 
@@ -1010,7 +1015,8 @@ window.savePopupSettings = async () => {
   try {
     if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
     await m.setDoc(m.doc(db, 'settings', 'popup'), {
-      enabled, delay, autoClose,
+    await logActivity('💬', 'Popup message saved', title || '');
+          enabled, delay, autoClose,
       mediaType: _popMediaType, mediaUrl,
       title, body, btnLabel, btnUrl,
       showFrom:  fromVal  ? Ts.fromDate(new Date(fromVal))  : null,
@@ -1024,6 +1030,92 @@ window.savePopupSettings = async () => {
     if (btn) { btn.innerHTML = '&#x1F4BE; Save Popup Settings'; btn.disabled = false; }
   }
 };
+/* ══════════════════════════════════════
+   ACTIVITY LOG  — real-time across all admins
+══════════════════════════════════════ */
+var _currentAdminName = '';  // set on login
+
+/* Log an action to Firestore (called by every save/delete function) */
+window.logActivity = async function(icon, action, detail) {
+  const db = window.__db;
+  if (!db) return;
+  const m = window.__fbModules;
+  try {
+    await m.addDoc(m.collection(db, 'activity'), {
+      icon:   icon   || '⚙️',
+      action: action || 'Updated',
+      detail: detail || '',
+      who:    _currentAdminName || 'Admin',
+      at:     m.serverTimestamp()
+    });
+  } catch(e) { /* silent */ }
+};
+
+/* Subscribe to activity collection — real-time feed */
+function subscribeActivity() {
+  const db = window.__db;
+  if (!db) { setTimeout(subscribeActivity, 600); return; }
+  const m = window.__fbModules;
+  const q = m.query(m.collection(db, 'activity'), m.orderBy('at', 'desc'));
+  m.onSnapshot(q, snap => {
+    const el = document.getElementById('d-activity');
+    if (!el) return;
+    if (snap.empty) {
+      el.innerHTML = '<div class="empty" style="padding:20px"><div class="empty-ico">&#x1F4CB;</div><div class="empty-txt">No activity yet</div></div>';
+      return;
+    }
+    // Track new doc IDs for highlight animation
+    const existing = new Set([...el.querySelectorAll('.act-item')].map(e => e.dataset.id));
+    const rows = snap.docs.slice(0, 50).map(doc => {
+      const d   = doc.data();
+      const isNew = !existing.has(doc.id);
+      const ts  = d.at ? (d.at.toDate ? d.at.toDate() : new Date(d.at.seconds * 1000)) : new Date();
+      const ago = timeAgo(ts);
+      return `<div class="act-item${isNew ? ' act-new' : ''}" data-id="${doc.id}">
+        <div class="act-ico">${d.icon || '⚙️'}</div>
+        <div class="act-body">
+          <div class="act-who">${escHtml(d.who || 'Admin')}</div>
+          <div class="act-what">${escHtml(d.action)}${d.detail ? ' — <span style="color:var(--txt2)">' + escHtml(d.detail) + '</span>' : ''}</div>
+          <div class="act-when">${ago}</div>
+        </div>
+      </div>`;
+    }).join('');
+    el.innerHTML = rows;
+  }, () => {});
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function timeAgo(date) {
+  const diff = Date.now() - date.getTime();
+  const s = Math.floor(diff / 1000);
+  if (s < 60)  return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60)  return m + 'm ago';
+  const h = Math.floor(m / 60);
+  if (h < 24)  return h + 'h ago';
+  return Math.floor(h / 24) + 'd ago';
+}
+
+/* Clear activity logs older than 7 days */
+window.clearOldActivity = async function() {
+  if (!confirm('Delete activity logs older than 7 days?')) return;
+  const db = window.__db;
+  if (!db) return;
+  const m = window.__fbModules;
+  const cutoff = new Date(Date.now() - 7 * 86400000);
+  try {
+    const q    = m.query(m.collection(db, 'activity'), m.where('at', '<', m.Timestamp.fromDate(cutoff)));
+    const snap = await m.getDocs(q);
+    const dels = snap.docs.map(d => m.deleteDoc(d.ref));
+    await Promise.all(dels);
+    toast('Cleared ' + snap.docs.length + ' old log entries', 'success');
+  } catch(e) { toast('Could not clear: ' + e.message, 'error'); }
+};
+
+
 /* ── Reset popup form to blank state ── */
 window.resetPopupForm = function() {
   if (!confirm('Reset all popup fields to blank? (This does not change saved settings)')) return;
@@ -1041,7 +1133,8 @@ window.deletePopupSettings = async function() {
   try {
     if (btn) { btn.textContent = 'Deleting...'; btn.disabled = true; }
     await m.deleteDoc(m.doc(db, 'settings', 'popup'));
-    renderPopupPage({});  // clear form
+    await logActivity('🗑️', 'Popup message deleted', '');
+        renderPopupPage({});  // clear form
     toast('Popup deleted successfully', 'success');
   } catch(e) {
     toast('Delete failed: ' + e.message, 'error');
@@ -1131,6 +1224,118 @@ window._closeFdPopup = () => {
   ov.style.opacity    = '0';
   ov.style.transition = 'opacity .35s';
   setTimeout(() => { ov.remove(); document.body.style.overflow = ''; }, 360);
+};
+
+
+/* ══════════════════════════════════════
+   SOCIAL MEDIA LINKS
+══════════════════════════════════════ */
+var _socialCache = {};
+
+function subscribeSocial() {
+  const db = window.__db;
+  if (!db) { setTimeout(subscribeSocial, 600); return; }
+  const m = window.__fbModules;
+  m.onSnapshot(m.doc(db, 'settings', 'social'), snap => {
+    _socialCache = snap.exists() ? snap.data() : {};
+    renderSocialPage();
+  }, () => {});
+}
+
+function renderSocialPage() {
+  const d = _socialCache;
+  const ids = ['youtube','facebook','instagram','whatsapp','tiktok','twitter','linkedin','github'];
+  ids.forEach(id => {
+    const el = document.getElementById('sl-' + id);
+    if (el) el.value = d[id] || '';
+  });
+}
+
+window.saveSocialLinks = async function() {
+  const db = window.__db;
+  if (!db) { toast('DB not ready', 'error'); return; }
+  const m = window.__fbModules;
+  const ids = ['youtube','facebook','instagram','whatsapp','tiktok','twitter','linkedin','github'];
+  const data = {};
+  ids.forEach(id => {
+    const el = document.getElementById('sl-' + id);
+    if (el) data[id] = el.value.trim();
+  });
+  try {
+    await m.setDoc(m.doc(db, 'settings', 'social'), { ...data, updatedAt: m.serverTimestamp() });
+    await logActivity('🔗', 'Social Media links updated', '');
+    toast('Social links saved! Website updated live.', 'success');
+  } catch(e) {
+    toast('Save failed: ' + e.message, 'error');
+  }
+};
+
+/* ══════════════════════════════════════
+   YOUTUBE SECTION
+══════════════════════════════════════ */
+var _youtubeCache = {};
+
+function loadYoutubeSettings() {
+  const db = window.__db;
+  if (!db) { setTimeout(loadYoutubeSettings, 600); return; }
+  const m = window.__fbModules;
+  m.onSnapshot(m.doc(db, 'settings', 'youtube'), snap => {
+    _youtubeCache = snap.exists() ? snap.data() : {};
+    renderYoutubePage();
+  }, () => {});
+}
+
+function renderYoutubePage() {
+  const d = _youtubeCache;
+  const sv = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+  sv('yt-url',     d.videoUrl);
+  sv('yt-title',   d.title);
+  sv('yt-desc',    d.description);
+  sv('yt-channel', d.channel);
+  sv('yt-btn-txt', d.btnTxt);
+  sv('yt-heading', d.heading);
+
+  // Preview
+  const cur = document.getElementById('yt-current-url');
+  if (cur) cur.textContent = d.videoUrl || 'Not set';
+  updateYtPreview(d.videoUrl || '');
+}
+
+window.updateYtPreview = function(url) {
+  const wrap  = document.getElementById('yt-preview-wrap');
+  const frame = document.getElementById('yt-preview-frame');
+  if (!wrap || !frame) return;
+  const ytId = url.match(/(?:v=|youtu\.be\/)([^&?/]+)/);
+  if (ytId) {
+    wrap.style.display = 'block';
+    frame.src = 'https://www.youtube.com/embed/' + ytId[1];
+  } else {
+    wrap.style.display = 'none';
+    frame.src = '';
+  }
+};
+
+window.saveYoutubeSettings = async function() {
+  const db = window.__db;
+  if (!db) { toast('DB not ready', 'error'); return; }
+  const m = window.__fbModules;
+  const gv = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  try {
+    await m.setDoc(m.doc(db, 'settings', 'youtube'), {
+      videoUrl:    gv('yt-url'),
+      title:       gv('yt-title'),
+      description: gv('yt-desc'),
+      channel:     gv('yt-channel'),
+      btnTxt:      gv('yt-btn-txt'),
+      heading:     gv('yt-heading'),
+      updatedAt:   m.serverTimestamp()
+    });
+    await logActivity('▶️', 'YouTube section updated', '');
+    toast('YouTube settings saved! Website updated.', 'success');
+    renderYoutubePage();
+  } catch(e) {
+    toast('Save failed: ' + e.message, 'error');
+  }
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1225,6 +1430,16 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9000;
 .sb-it:hover{color:var(--txt);background:rgba(82,130,255,.06);border-color:var(--bdr)}
 .sb-it.on{color:var(--blue);background:rgba(82,130,255,.09);border-color:rgba(82,130,255,.2)}
 .sb-ico{width:15px;flex-shrink:0;opacity:.75}
+.act-item{display:flex;align-items:flex-start;gap:12px;padding:11px 16px;border-bottom:1px solid var(--bdr);transition:background .2s}
+.act-item:last-child{border-bottom:none}
+.act-item:hover{background:var(--bg3)}
+.act-ico{font-size:1.1rem;flex-shrink:0;margin-top:1px}
+.act-body{flex:1;min-width:0}
+.act-who{font-size:.72rem;font-weight:700;color:var(--blue2);margin-bottom:2px}
+.act-what{font-size:.82rem;color:var(--txt);line-height:1.4}
+.act-when{font-size:.68rem;color:var(--txt3);margin-top:3px}
+.act-new{background:rgba(82,130,255,.06);animation:actFade 3s ease forwards}
+@keyframes actFade{0%{background:rgba(82,130,255,.12)}100%{background:transparent}}
 .sb-badge{margin-left:auto;min-width:18px;height:18px;padding:0 5px;background:var(--red);color:white;font-size:.58rem;font-weight:700;display:flex;align-items:center;justify-content:center;border-radius:9px}
 .sb-foot{padding:12px 18px;border-top:1px solid var(--bdr)}
 .sb-out{width:100%;padding:9px;background:transparent;border:1px solid var(--bdr);color:var(--txt3);font-family:'Inter',sans-serif;font-size:.8rem;cursor:pointer;transition:all .25s;display:flex;align-items:center;gap:8px;justify-content:center}
@@ -1642,6 +1857,19 @@ tr:hover td{background:rgba(82,130,255,.03)}
           <div class="dpanel">
             <div class="dp-head"><div class="dp-title">Recent Projects</div><span class="dp-link" onclick="gotoPage('project_view')">View All →</span></div>
             <div id="d-projs"><div class="empty" style="padding:20px"><div class="empty-ico">📁</div><div class="empty-txt">Loading...</div></div></div>
+          </div>
+        </div>
+
+        <!-- ACTIVITY LOG PANEL -->
+        <div style="margin-top:20px">
+          <div class="dpanel" style="max-width:100%">
+            <div class="dp-head">
+              <div class="dp-title">&#x1F4CB; Admin Activity Log <span id="activity-live-dot" style="display:inline-block;width:7px;height:7px;background:var(--mint);border-radius:50%;margin-left:6px;animation:pulse 2s ease infinite;vertical-align:middle"></span></div>
+              <span class="dp-link" onclick="clearOldActivity()" style="color:var(--txt3);font-size:.72rem">Clear old logs</span>
+            </div>
+            <div id="d-activity" style="max-height:320px;overflow-y:auto">
+              <div class="empty" style="padding:20px"><div class="empty-ico">&#x1F4CB;</div><div class="empty-txt">No activity yet</div></div>
+            </div>
           </div>
         </div>
       </div>
@@ -2264,6 +2492,79 @@ tr:hover td{background:rgba(82,130,255,.03)}
             ⚡ Save All & Update Live
           </button>
         </div>
+        <div style="background:rgba(62,240,184,.07);border:1px solid rgba(62,240,184,.2);padding:13px 18px;margin-bottom:22px;display:flex;align-items:center;gap:12px;font-size:.83rem;color:var(--txt2)">
+          <span style="font-size:1.3rem">🔗</span>
+          <div>Update any social media link here — changes apply to the <strong style="color:var(--txt)">live website instantly</strong>. Leave blank to hide that platform.</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px" id="social-fields-grid">
+
+          <div class="sp">
+            <div class="sp-title" style="color:#ff2020">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="#ff2020"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg>
+              YouTube
+            </div>
+            <div class="fg"><label class="fl">Channel URL</label><input class="fi" id="sl-youtube" type="url" placeholder="https://www.youtube.com/channel/..."></div>
+          </div>
+
+          <div class="sp">
+            <div class="sp-title" style="color:#1877f2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="#1877f2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+              Facebook
+            </div>
+            <div class="fg"><label class="fl">Page URL</label><input class="fi" id="sl-facebook" type="url" placeholder="https://www.facebook.com/featuredesignz"></div>
+          </div>
+
+          <div class="sp">
+            <div class="sp-title" style="color:#e1306c">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="#e1306c"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+              Instagram
+            </div>
+            <div class="fg"><label class="fl">Profile URL</label><input class="fi" id="sl-instagram" type="url" placeholder="https://www.instagram.com/featuredesignz"></div>
+          </div>
+
+          <div class="sp">
+            <div class="sp-title" style="color:#25d366">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+              WhatsApp
+            </div>
+            <div class="fg"><label class="fl">Number (with country code)</label><input class="fi" id="sl-whatsapp" type="text" placeholder="94786675150 (no + or spaces)"></div>
+          </div>
+
+          <div class="sp">
+            <div class="sp-title" style="color:#fff">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.19 8.19 0 004.77 1.52V6.73a4.85 4.85 0 01-1-.04z"/></svg>
+              TikTok
+            </div>
+            <div class="fg"><label class="fl">Profile URL</label><input class="fi" id="sl-tiktok" type="url" placeholder="https://www.tiktok.com/@featuredesignz"></div>
+          </div>
+
+          <div class="sp">
+            <div class="sp-title" style="color:#fff">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.258 5.626 5.906-5.626zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+              X (Twitter)
+            </div>
+            <div class="fg"><label class="fl">Profile URL</label><input class="fi" id="sl-twitter" type="url" placeholder="https://x.com/featuredesignz"></div>
+          </div>
+
+          <div class="sp">
+            <div class="sp-title" style="color:#0a66c2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="#0a66c2"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+              LinkedIn
+            </div>
+            <div class="fg"><label class="fl">Profile URL</label><input class="fi" id="sl-linkedin" type="url" placeholder="https://www.linkedin.com/company/featuredesignz"></div>
+          </div>
+
+          <div class="sp">
+            <div class="sp-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--blue)"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
+              GitHub
+            </div>
+            <div class="fg"><label class="fl">Profile URL</label><input class="fi" id="sl-github" type="url" placeholder="https://github.com/featuredesignz"></div>
+          </div>
+
+        </div>
+      </div>
+
 
       <!-- POPUP MESSAGE PAGE -->
       <div class="page" id="page-popup">
@@ -2941,6 +3242,7 @@ window.setServiceStatus = async function(sid, status) {
       updatedAt: serverTimestamp(),
       updatedBy: window.currentUser?.email || 'admin'
     });
+    logActivity('⚡', 'Service status updated', sid);
     servicesCache[sid] = status;
     updateSvcCard(sid);
     toast('Service updated → ' + (opt?.label || status) + ' ⚡', 'success');
@@ -3250,6 +3552,7 @@ window.toggleNoticesVisibility = async function() {
   updateNoticesVisUI(visible);
   const { doc, setDoc, serverTimestamp } = window.__fbModules;
   await setDoc(doc(_db,'settings','notices'), { visible, updatedAt: serverTimestamp() });
+    logActivity('📢', 'Notices visibility ' + (visible ? 'ON' : 'OFF'), '');
   toast(visible ? 'Notices section shown on website ✓' : 'Notices section hidden from website', visible?'success':'error');
 };
 
@@ -3351,10 +3654,12 @@ window.saveNotice = async function() {
 
     if (noticeEditId) {
       await updateDoc(doc(_db,'notices',noticeEditId), data);
+    await logActivity('📝', 'Notice updated', '');
       toast('Notice updated ✓','success');
     } else {
       data.createdAt = serverTimestamp();
       await addDoc(collection(_db,'notices'), data);
+    await logActivity('📢', 'Notice created', '');
       toast('Notice published ✓','success');
     }
     closeM('noticeModal');
@@ -3378,6 +3683,7 @@ window.deleteNotice = async function(id) {
   if (!_db) return;
   const { doc, deleteDoc } = window.__fbModules;
   await deleteDoc(doc(_db,'notices',id));
+    await logActivity('🗑️', 'Notice deleted', '');
   toast('Notice deleted','success');
 };
 
@@ -3515,6 +3821,7 @@ window.saveMaintenanceSettings = async function(enabledOverride) {
       updatedAt: serverTimestamp(),
       updatedBy: window.currentUser?.email || 'admin'
     });
+    await logActivity('🔧', 'Maintenance Mode ' + (enabled ? 'ENABLED ⚠️' : 'DISABLED'), type);
     maintCache = { enabled, type, title, message, eta, email };
     updateSbMaintBadge();
     toast(enabled ? '🔴 Maintenance Mode ON — website offline for visitors!' : '✅ Maintenance Mode OFF — website is live!',
@@ -3573,6 +3880,7 @@ window.saveHeroStats = async function() {
       updatedAt: serverTimestamp(),
       updatedBy: window.currentUser?.email || 'admin'
     });
+    await logActivity('📊', 'Hero Stats updated', '');
     heroStatsCache = { projects, clients, years };
     toast('Hero stats updated on live website ⚡', 'success');
   } catch(e) { toast('Error: '+e.message,'error'); }
@@ -3667,6 +3975,8 @@ window.setStudioStatus = async function(status) {
       updatedAt: serverTimestamp(),
       updatedBy: window.currentUser?.email || 'admin'
     });
+    await logActivity('🎙️', 'Studio Status updated', '');
+    await logActivity('🎙️', 'Studio Status updated', '');
     toast('Studio status → ' + s.label + ' ✓ Live!', 'success');
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 };
@@ -3789,6 +4099,7 @@ window.saveAiSettings = async function() {
       enabled, bizName, services, instructions, defaultTone,
       updatedAt: serverTimestamp()
     });
+    await logActivity('🤖', 'AI Assistant settings updated', '');
     aiSettings = { enabled, bizName, services, instructions, defaultTone };
     updateAiPromptPreview();
     toast('AI Assistant settings saved ✓', 'success');
