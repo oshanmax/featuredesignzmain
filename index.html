@@ -1635,6 +1635,11 @@ function fdEsc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;
       if (snap.exists()) applyYoutube(snap.data());
     });
 
+    // ── 6. CONTACT FORM OPTIONS ──────────────
+    onSnapshot(doc(db,'settings','contactForm'), snap => {
+      if (snap.exists()) applyContactForm(snap.data());
+    });
+
     // ── 5. SOCIAL LINKS ──────────────
     onSnapshot(doc(db,'settings','social'), snap => {
       if (snap.exists()) applySocialLinks(snap.data());
@@ -2195,6 +2200,27 @@ function applyYoutube(data) {
   if (btnEl    && data.channel)                  btnEl.href          = data.channel;
   if (btnLabel && data.btnTxt)                   btnLabel.textContent = data.btnTxt;
 }
+function applyContactForm(data) {
+  // Update Service Required dropdown
+  var svcSel = document.getElementById('f-service');
+  if (svcSel && data.services && data.services.length) {
+    var curVal = svcSel.value;
+    svcSel.innerHTML = '<option value="">Select a service...</option>' +
+      data.services.map(function(s) {
+        return '<option' + (s === curVal ? ' selected' : '') + '>' + s + '</option>';
+      }).join('');
+  }
+  // Update Budget Range dropdown
+  var budSel = document.getElementById('f-budget');
+  if (budSel && data.budgets && data.budgets.length) {
+    var curBud = budSel.value;
+    budSel.innerHTML = '<option value="">Select budget...</option>' +
+      data.budgets.map(function(b) {
+        return '<option' + (b === curBud ? ' selected' : '') + '>' + b + '</option>';
+      }).join('');
+  }
+}
+
 
 // ── SOCIAL LINKS ─────────────────────
 function applySocialLinks(data) {

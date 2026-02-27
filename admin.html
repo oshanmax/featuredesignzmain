@@ -258,6 +258,7 @@ function initApp(user, role) {
   subscribeNotices();
   subscribePopup();
   subscribeActivity();
+  subscribeContactForm();
   if (role === 'main_admin') subscribeAdmins();
 
   // Show dashboard
@@ -997,7 +998,7 @@ window.gotoPage = function(id) {
   document.querySelectorAll('.sb-it').forEach(i => {
     if (i.getAttribute('onclick')?.includes("'" + id + "'")) i.classList.add('on');
   });
-  const titles = { dashboard:'Dashboard', projects:'All Projects', project_view:'Projects Overview', messages:'Messages', website:'Website Overview', herostats:'Hero Stats', maintenance:'Maintenance Mode', notices:'Notices & Announcements', studio:'Studio Status', services:'Services Status', youtube:'YouTube Section', social:'Social Media Links', popup:'Popup Message', admins:'Admin Management', settings:'Settings' };
+  const titles = { dashboard:'Dashboard', projects:'All Projects', project_view:'Projects Overview', messages:'Messages', website:'Website Overview', herostats:'Hero Stats', maintenance:'Maintenance Mode', notices:'Notices & Announcements', studio:'Studio Status', services:'Services Status', contactform:'Contact Form', youtube:'YouTube Section', social:'Social Media Links', popup:'Popup Message', admins:'Admin Management', settings:'Settings' };
   const el = document.getElementById('tb-title');
   if (el) el.textContent = titles[id] || id;
   if (id === 'dashboard') renderDash();
@@ -1563,6 +1564,114 @@ window.toast = function(msg, type = 'success') {
   tTimer = setTimeout(() => el.classList.remove('show'), 4000);
 };
 
+
+/* ══════════════════════════════════════
+   CONTACT FORM SETTINGS
+══════════════════════════════════════ */
+var _cfData = {
+  services: [
+    'Full Stack Web Development',
+    'App Development',
+    'Branding & Graphic Design',
+    'Video Editing & Motion',
+    'Multiple Services'
+  ],
+  budgets: [
+    '$100 – $300',
+    '$300 – $500',
+    '$500 – $1,000',
+    '$1,000 – $3,000',
+    '$3,000+'
+  ]
+};
+
+function subscribeContactForm() {
+  const db = window.__db;
+  if (!db) return;
+  const m = window.__fbModules;
+  m.onSnapshot(m.doc(db, 'settings', 'contactForm'), snap => {
+    if (snap.exists()) {
+      const d = snap.data();
+      if (d.services && d.services.length) _cfData.services = d.services;
+      if (d.budgets  && d.budgets.length)  _cfData.budgets  = d.budgets;
+    }
+    renderContactFormPage();
+  });
+}
+
+function renderContactFormPage() {
+  renderCfList('cf-services-list', _cfData.services, 'service');
+  renderCfList('cf-budgets-list',  _cfData.budgets,  'budget');
+}
+
+function renderCfList(elId, arr, type) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (!arr.length) {
+    el.innerHTML = '<div style="color:var(--txt3);font-size:.78rem;padding:10px 0">None yet — click "+ Add" to add one</div>';
+    return;
+  }
+  el.innerHTML = arr.map((item, i) => `
+    <div style="display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--bdr);padding:8px 12px">
+      <span style="color:var(--txt3);font-size:.7rem;min-width:20px">${i+1}</span>
+      <input class="fi" value="${escHtml(item)}" oninput="cfUpdateItem('${type}',${i},this.value)"
+        style="flex:1;padding:5px 8px;font-size:.82rem;min-width:0">
+      <button onclick="cfMoveItem('${type}',${i},-1)" style="background:none;border:1px solid var(--bdr);color:var(--txt2);padding:3px 7px;cursor:pointer;font-size:.8rem" title="Move up">↑</button>
+      <button onclick="cfMoveItem('${type}',${i},1)"  style="background:none;border:1px solid var(--bdr);color:var(--txt2);padding:3px 7px;cursor:pointer;font-size:.8rem" title="Move down">↓</button>
+      <button onclick="cfDeleteItem('${type}',${i})"  style="background:none;border:1px solid rgba(248,113,113,.3);color:var(--red);padding:3px 7px;cursor:pointer;font-size:.8rem">✕</button>
+    </div>`).join('');
+}
+
+window.cfAddService = function() {
+  _cfData.services.push('New Service');
+  renderContactFormPage();
+};
+window.cfAddBudget = function() {
+  _cfData.budgets.push('$0 – $0');
+  renderContactFormPage();
+};
+window.cfUpdateItem = function(type, i, val) {
+  if (type === 'service') _cfData.services[i] = val;
+  else                    _cfData.budgets[i]  = val;
+};
+window.cfMoveItem = function(type, i, dir) {
+  var arr = type === 'service' ? _cfData.services : _cfData.budgets;
+  var j = i + dir;
+  if (j < 0 || j >= arr.length) return;
+  var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+  renderContactFormPage();
+};
+window.cfDeleteItem = function(type, i) {
+  if (type === 'service') _cfData.services.splice(i, 1);
+  else                    _cfData.budgets.splice(i, 1);
+  renderContactFormPage();
+};
+
+window.saveContactForm = async function() {
+  const db = window.__db;
+  if (!db) { toast('DB not ready', 'error'); return; }
+  const m = window.__fbModules;
+  try {
+    await m.setDoc(m.doc(db, 'settings', 'contactForm'), {
+      services:  _cfData.services.filter(s => s.trim()),
+      budgets:   _cfData.budgets.filter(b => b.trim()),
+      updatedAt: m.serverTimestamp()
+    });
+    await logActivity('📋', 'Contact form options updated', '');
+    toast('Contact form updated! Live on website ✓', 'success');
+  } catch(e) {
+    toast('Save failed: ' + e.message, 'error');
+  }
+};
+
+window.resetContactForm = function() {
+  _cfData.services = ['Full Stack Web Development','App Development','Branding & Graphic Design','Video Editing & Motion','Multiple Services'];
+  _cfData.budgets  = ['$100 – $300','$300 – $500','$500 – $1,000','$1,000 – $3,000','$3,000+'];
+  renderContactFormPage();
+  toast('Reset to defaults — click Save to apply', 'success');
+};
+
+
 // Progress slider live update
 window.updateProgress = function(val) {
   document.getElementById('pe-prog-val').textContent = val + '%';
@@ -2022,6 +2131,10 @@ tr:hover td{background:rgba(82,130,255,.03)}
       <div class="sb-it" onclick="gotoPage('services')">
         <svg class="sb-ico" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
         Services Status
+      </div>
+      <div class="sb-it" onclick="gotoPage('contactform')">
+        <svg class="sb-ico" viewBox="0 0 20 20" fill="currentColor"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/></svg>
+        Contact Form
       </div>
       <div class="sb-it" onclick="gotoPage('youtube')">
         <svg class="sb-ico" viewBox="0 0 24 24" fill="currentColor"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg>
@@ -2704,6 +2817,49 @@ tr:hover td{background:rgba(82,130,255,.03)}
             ⚡ Save Custom Status to Live Website
           </button>
           <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--txt3);text-align:center;margin-top:8px">Quick-select buttons above save instantly without this button</div>
+        </div>
+      </div>
+
+      <!-- CONTACT FORM SETTINGS -->
+      <div class="page" id="page-contactform">
+        <div class="ph">
+          <div class="ph-title">Contact <em>Form</em></div>
+        </div>
+
+        <div style="background:rgba(56,217,245,.06);border:1px solid rgba(56,217,245,.2);padding:13px 18px;margin-bottom:24px;display:flex;gap:10px;align-items:flex-start">
+          <span style="font-size:1rem">📋</span>
+          <div style="font-size:.82rem;color:var(--txt2)">Customize the <b style="color:var(--cyan)">Service Required</b> and <b style="color:var(--cyan)">Budget Range</b> dropdowns shown in your website contact form. Changes go live instantly.</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+
+          <!-- SERVICES -->
+          <div class="sp">
+            <div class="sp-title" style="display:flex;align-items:center;justify-content:space-between">
+              <span>⚙️ Services List</span>
+              <button class="btn btn-primary btn-sm" onclick="cfAddService()">+ Add Service</button>
+            </div>
+            <div style="font-size:.75rem;color:var(--txt3);margin-bottom:16px">Shown in "Service Required" dropdown</div>
+            <div id="cf-services-list" style="display:flex;flex-direction:column;gap:8px"></div>
+          </div>
+
+          <!-- BUDGETS -->
+          <div class="sp">
+            <div class="sp-title" style="display:flex;align-items:center;justify-content:space-between">
+              <span>💰 Budget Ranges</span>
+              <button class="btn btn-primary btn-sm" onclick="cfAddBudget()">+ Add Range</button>
+            </div>
+            <div style="font-size:.75rem;color:var(--txt3);margin-bottom:16px">Shown in "Budget Range (USD)" dropdown</div>
+            <div id="cf-budgets-list" style="display:flex;flex-direction:column;gap:8px"></div>
+          </div>
+
+        </div>
+
+        <div style="margin-top:24px;display:flex;gap:12px">
+          <button class="btn btn-primary" onclick="saveContactForm()" style="min-width:160px">
+            💾 Save & Go Live
+          </button>
+          <button class="btn btn-ghost" onclick="resetContactForm()">↺ Reset to Defaults</button>
         </div>
       </div>
 
