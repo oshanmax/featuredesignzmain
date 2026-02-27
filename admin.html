@@ -593,6 +593,7 @@ window.openProjModal = function(id = null) {
   document.getElementById('pe-progress').value = '0';
   document.getElementById('pe-prog-val').textContent = '0%';
   document.getElementById('pe-id').value = '';
+  window.renderProjRating(0); // reset stars for new project
 
   if (id) {
     const x = projectsCache.find(p => p.id === id);
@@ -620,6 +621,7 @@ window.openProjModal = function(id = null) {
       const hc = document.getElementById('pe-hide-status');
       const hide = x.hideStatus === true;
       if (hc) { hc.checked = hide; updateHideToggle(hide); }
+      window.renderProjRating(x.rating || 0); // load saved rating
     }
   }
   openM('projModal');
@@ -647,7 +649,8 @@ window.saveProject = async function() {
   const screenshotsRaw = document.getElementById('pe-screenshots').value || '';
   const screenshots = screenshotsRaw.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,10);
   const videoUrl    = document.getElementById('pe-video').value.trim();
-  const data = { name, cat, desc, tags, url, githubUrl, imageUrl, screenshots, videoUrl, emoji, status, progress, client, notes, display, hideStatus, updatedAt: serverTimestamp() };
+  const rating = parseInt(document.getElementById('pe-rating')?.value) || 0;
+  const data = { name, cat, desc, tags, url, githubUrl, imageUrl, screenshots, videoUrl, emoji, status, progress, client, notes, display, hideStatus, rating, updatedAt: serverTimestamp() };
 
   try {
     if (pEditId) {
@@ -1566,6 +1569,25 @@ window.updateProgress = function(val) {
   const status = document.getElementById('pe-status');
   if (parseInt(val) >= 100) status.value = 'completed';
   else if (parseInt(val) > 0) status.value = 'inprogress';
+};
+
+// ── STAR RATING ──
+window.setProjRating = function(val) {
+  document.getElementById('pe-rating').value = val;
+  const stars = document.querySelectorAll('.star-btn');
+  const labels = ['Not rated','⭐ 1 star — Poor','⭐⭐ 2 stars — Fair','⭐⭐⭐ 3 stars — Good','⭐⭐⭐⭐ 4 stars — Great','⭐⭐⭐⭐⭐ 5 stars — Excellent!'];
+  stars.forEach((s, i) => {
+    s.textContent = (i < val) ? '★' : '☆';
+    s.style.color  = (i < val) ? '#f5c842' : 'var(--txt3)';
+    s.style.transform = (i < val) ? 'scale(1.1)' : 'scale(1)';
+  });
+  const lbl = document.getElementById('pe-rating-label');
+  if (lbl) lbl.textContent = labels[val] || 'Not rated';
+};
+
+window.renderProjRating = function(val) {
+  val = parseInt(val) || 0;
+  window.setProjRating(val);
 };
 </script>
 
@@ -3196,6 +3218,24 @@ tr:hover td{background:rgba(82,130,255,.03)}
         </select>
       </div>
       <div class="fg"><label class="fl">Internal Notes</label><textarea class="fta" id="pe-notes" placeholder="Private notes about this project..."></textarea></div>
+
+    <!-- CLIENT SATISFACTION RATING -->
+    <div class="fg" style="margin-top:4px">
+      <label class="fl">Client Satisfaction Rating</label>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:6px">
+        <div id="pe-stars-display" style="display:flex;gap:4px;font-size:1.6rem;cursor:pointer">
+          <span class="star-btn" data-val="1" onclick="setProjRating(1)" style="transition:transform .15s">☆</span>
+          <span class="star-btn" data-val="2" onclick="setProjRating(2)" style="transition:transform .15s">☆</span>
+          <span class="star-btn" data-val="3" onclick="setProjRating(3)" style="transition:transform .15s">☆</span>
+          <span class="star-btn" data-val="4" onclick="setProjRating(4)" style="transition:transform .15s">☆</span>
+          <span class="star-btn" data-val="5" onclick="setProjRating(5)" style="transition:transform .15s">☆</span>
+        </div>
+        <div style="font-size:.78rem;color:var(--txt2)" id="pe-rating-label">Not rated</div>
+        <button onclick="setProjRating(0)" style="background:none;border:none;color:var(--txt3);font-size:.7rem;cursor:pointer;padding:2px 6px;border:1px solid var(--bdr);border-radius:3px">Clear</button>
+      </div>
+      <input type="hidden" id="pe-rating" value="0">
+      <div style="font-size:.68rem;color:var(--txt3);margin-top:4px">Stars shown on website on completed projects only</div>
+    </div>
     </div>
     <div class="mf">
       <button class="btn btn-ghost" onclick="closeM('projModal')">Cancel</button>

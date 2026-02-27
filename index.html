@@ -1296,6 +1296,20 @@ window.openProjectDetail = function(id) {
   if (p.client) { document.getElementById('pd-client').textContent = p.client; clientRow.style.display = ''; }
   else clientRow.style.display = 'none';
 
+  // Star rating
+  const ratingRow = document.getElementById('pd-rating-row');
+  const starsEl   = document.getElementById('pd-stars');
+  const ratingTxt = document.getElementById('pd-rating-txt');
+  const rating    = parseInt(p.rating) || 0;
+  if (ratingRow && rating > 0) {
+    ratingRow.style.display = '';
+    if (starsEl)   starsEl.textContent  = '★'.repeat(rating) + '☆'.repeat(5 - rating);
+    const rLabels = ['','1/5 — Poor','2/5 — Fair','3/5 — Good','4/5 — Great','5/5 — Excellent!'];
+    if (ratingTxt) ratingTxt.textContent = rLabels[rating] || '';
+  } else if (ratingRow) {
+    ratingRow.style.display = 'none';
+  }
+
   // Notes (public-safe — only show if non-empty)
   const notesRow = document.getElementById('pd-notes-row');
   // Don't show internal notes publicly — leave hidden
@@ -2329,9 +2343,18 @@ function applySocialLinks(data) {
       <div id="pd-tags" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px"></div>
 
       <!-- Client row -->
-      <div id="pd-client-row" style="display:none;background:var(--bg3);border:1px solid var(--bdr);padding:10px 14px;margin-bottom:18px;font-size:.82rem">
+      <div id="pd-client-row" style="display:none;background:var(--bg3);border:1px solid var(--bdr);padding:10px 14px;margin-bottom:12px;font-size:.82rem">
         <span style="color:var(--txt3);font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase">Client</span>
         <div id="pd-client" style="color:var(--txt);font-weight:600;margin-top:3px"></div>
+      </div>
+
+      <!-- Client Rating -->
+      <div id="pd-rating-row" style="display:none;margin-bottom:18px;padding:10px 14px;background:var(--bg3);border:1px solid var(--bdr)">
+        <span style="color:var(--txt3);font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:6px">Client Satisfaction</span>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div id="pd-stars" style="font-size:1.25rem;letter-spacing:2px;color:#f5c842"></div>
+          <div id="pd-rating-txt" style="font-size:.78rem;color:var(--txt2);font-family:'JetBrains Mono',monospace"></div>
+        </div>
       </div>
 
       <!-- Links -->
