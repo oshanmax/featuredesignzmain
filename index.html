@@ -2005,7 +2005,7 @@ window.showFdPopup = function(data, isPreview) {
   /* ── Overlay ── */
   var ov = document.createElement('div');
   ov.id = 'fd-popup-overlay';
-  ov.style.cssText = 'position:fixed;inset:0;z-index:9500;background:rgba(2,5,16,.85);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9500;background:rgba(2,5,16,.85);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px);opacity:0;transition:opacity .35s';
   ov.onclick = function(e){ if (e.target === ov) _closeFdPopup(); };
 
   ov.innerHTML =
@@ -2019,6 +2019,13 @@ window.showFdPopup = function(data, isPreview) {
   document.body.appendChild(ov);
   document.body.style.overflow = 'hidden';
 
+  /* Fade in */
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      ov.style.opacity = '1';
+    });
+  });
+
   /* Fix broken image */
   var img = ov.querySelector('#fdpimg');
   if (img) img.onerror = function(){ img.style.display = 'none'; };
@@ -2026,11 +2033,17 @@ window.showFdPopup = function(data, isPreview) {
   /* ── Countdown + auto-close ── */
   if (ac > 0) {
     var bar = ov.querySelector('#fdpbar');
-    if (bar) requestAnimationFrame(function(){
-      bar.style.transition = 'width ' + ac + 's linear';
-      bar.style.width = '0%';
-    });
-    ov._act = setTimeout(_closeFdPopup, ac * 1000);
+    if (bar) {
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          bar.style.transition = 'width ' + ac + 's linear';
+          bar.style.width = '0%';
+        });
+      });
+    }
+    ov._act = setTimeout(function() {
+      window._closeFdPopup();
+    }, ac * 1000);
   }
 };
 
